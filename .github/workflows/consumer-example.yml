@@ -1,0 +1,17 @@
+# Installs PinCheck from GitHub exactly as a downstream repository does (see examples/consumer),
+# using examples/consumer/pincheck.json as that repository's manifest.
+name: Consumer example
+on:
+  pull_request:
+    paths: [examples/consumer/**]
+permissions:
+  contents: read
+jobs:
+  pincheck:
+    name: Circuit compatibility (installed action)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: hackcat29/PinCheck@ab080a6e1d6fb322be696f0244308cb80723d876 # product/release-gate
+        with:
+          manifest: examples/consumer/pincheck.json
