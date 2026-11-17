@@ -44,12 +44,19 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
           persist-credentials: false
+      # Only when this action is first introduced: the base commit has no action to run yet.
+      - id: base
+        run: |
+          if [ -f action.yml ]; then echo "action=yes" >> "$GITHUB_OUTPUT"; else
+            echo "::notice title=PinCheck::The base commit predates the PinCheck action, so there is nothing trusted to run yet."
+          fi
       - name: Gate pincheck.json
+        if: steps.base.outputs.action == 'yes'
         uses: ./
         with:
           manifest: pincheck.json
       - name: Gate the original demo manifest
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.base.outputs.action == 'yes' }}
         uses: ./
         with:
           manifest: demo/circuit.json
