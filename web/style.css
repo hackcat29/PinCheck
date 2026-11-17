@@ -34,9 +34,14 @@ section { position: relative; }
 .nav { position: sticky; top: 0; z-index: 40; background: rgba(9, 9, 11, .72); backdrop-filter: saturate(140%) blur(14px); -webkit-backdrop-filter: saturate(140%) blur(14px); border-bottom: 1px solid transparent; transition: border-color .3s; }
 .nav.scrolled { border-bottom-color: var(--line); }
 .nav-bar { display: flex; align-items: center; gap: 24px; height: 64px; }
-.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; letter-spacing: -.02em; text-decoration: none; color: var(--ink); }
-.mark { width: 20px; height: 20px; border: 2px solid var(--ink); border-radius: 6px; display: grid; place-items: center; }
-.mark i { width: 7px; height: 7px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+.brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 680; font-size: 18px; letter-spacing: -.035em; text-decoration: none; color: var(--ink); }
+/* Logo: a NAND gate, the TapeOut primitive, holding a check; the output bubble is the pin. */
+.logo { width: 28px; height: 28px; flex: none; overflow: visible; }
+.logo .bubble { fill: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); animation: bubble 3.2s ease-in-out infinite; transform-origin: 28.6px 16px; }
+.logo .tick { stroke-dasharray: 1; stroke-dashoffset: 0; }
+a.brand:hover .logo .tick { animation: draw .6s var(--ease); }
+@keyframes bubble { 50% { transform: scale(.8); } }
+@keyframes draw { from { stroke-dashoffset: 1; } }
 .nav nav { display: flex; gap: 4px; margin-left: auto; }
 .nav nav a { color: var(--muted); text-decoration: none; font-size: 14.5px; padding: 8px 12px; border-radius: 8px; transition: color .2s, background .2s; }
 .nav nav a:hover { color: var(--ink); background: var(--surface-2); }
@@ -364,8 +369,13 @@ tr.changed td { color: var(--bad); font-weight: 700; }
 .footer p { margin: 0 0 0 auto; }
 .footer p a { color: var(--muted); }
 .brand.small { font-size: 14px; color: var(--muted); font-weight: 500; }
-.brand.small .mark { width: 16px; height: 16px; border-width: 1.5px; border-radius: 5px; }
-.brand.small .mark i { width: 5px; height: 5px; }
+.brand.small .logo { width: 20px; height: 20px; }
+.brand.small .logo .bubble { animation: none; }
+
+/* ---------- 404 ---------- */
+.notfound { border-top: 0; min-height: 60svh; }
+.notfound h1 { font-size: clamp(2.6rem, 6vw, 4.4rem); letter-spacing: -.05em; margin-bottom: 16px; }
+.notfound p { color: var(--muted); margin: 0 0 32px; }
 
 /* ---------- docs ---------- */
 .docs { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 56px; padding-top: 56px; padding-bottom: 96px; }
