@@ -204,3 +204,42 @@ test('parses block selectors', () => {
   assert.deepEqual(parseBlock(snapshot.hash.toUpperCase().replace('0X', '0x')), { hash: snapshot.hash });
   assert.throws(() => parseBlock('yesterday'));
 });
+
+test('rate-limited RPC calls are retried and then succeed', async context => {
+  let limited = 0;
+  const original = globalThis.fetch;
+  node(context);
+  const fake = globalThis.fetch;
+  context.mock.method(globalThis, 'fetch', async (url, request) => {
+    if (limited < 2) { limited++; return new Response('slow down', { status: 429, headers: { 'retry-after': '0' } }); }
+    return fake(url, request);
+  });
+  const report = await compareOnChain(ref(1), ref(2));
+  assert.equal(limited, 2);
+  assert.equal(report.status, 'behavior-changed');
+  assert.ok(original);
+});
+
+test('an RPC that keeps rate limiting stays inconclusive after bounded retries', async context => {
+  let calls = 0;
+  context.mock.method(globalThis, 'fetch', async () => { calls++; return new Response('slow down', { status: 429 }); });
+  const report = await compareOnChain(ref(1), ref(2), { rpc: undefined });
+  assert.equal(report.status, 'inconclusive');
+  assert.equal(report.code, 'rpc-unavailable');
+  assert.match(report.reason, /429/);
+  assert.ok(calls <= 6, 'retries are bounded: ' + calls);
+});
+
+test('JSON-RPC rate-limit errors are retried too', async context => {
+  let limited = 0;
+  node(context);
+  const fake = globalThis.fetch;
+  context.mock.method(globalThis, 'fetch', async (url, request) => {
+    const { id } = JSON.parse(request.body);
+    if (limited < 1) { limited++; return Response.json({ jsonrpc: '2.0', id, error: { code: -32005, message: 'rate limit exceeded' } }); }
+    return fake(url, request);
+  });
+  const report = await compareOnChain(ref(1), ref(3));
+  assert.equal(limited, 1);
+  assert.equal(report.status, 'compatible');
+});

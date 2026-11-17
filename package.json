@@ -12,6 +12,12 @@
     "start": "node server.mjs",
     "check": "node cli.mjs",
     "vendor": "node scripts/vendor.mjs",
-    "netlists": "node scripts/record-netlists.mjs"
+    "netlists": "node scripts/record-netlists.mjs",
+    "build": "node scripts/build-site.mjs",
+    "dev:worker": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.164.0"
   }
 }

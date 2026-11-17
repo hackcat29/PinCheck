@@ -233,7 +233,7 @@ async function search(programs, nIn, nOut, words, seed, deadline) {
     }
     if ((word & 4095) === 4095) {
       if (Date.now() > deadline) throw new Unsupported('The comparison exceeded its time budget', 'time-budget');
-      await new Promise(resolve => setImmediate(resolve));
+      await new Promise(resolve => (globalThis.setImmediate ?? setTimeout)(resolve));
     }
   }
   return { mismatches, first };

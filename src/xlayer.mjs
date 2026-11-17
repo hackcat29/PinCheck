@@ -1,5 +1,3 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { compare, hex, refKey } from './compare.mjs';
 import { keccak256 } from './keccak.mjs';
@@ -59,37 +57,70 @@ export function redact(message, url) {
   return text.slice(0, 300);
 }
 
-export function createRpc(url = defaultRpc, { signal, transport = process.env.PINCHECK_RPC_TRANSPORT, maxCalls = MAX_CALLS } = {}) {
+const RETRY_STATUS = new Set([429, 502, 503, 504]);
+const RETRY_ATTEMPTS = 3;
+
+export function createRpc(url = defaultRpc, { signal, transport = globalThis.process?.env?.PINCHECK_RPC_TRANSPORT, maxCalls = MAX_CALLS, retryDelayMs = 300 } = {}) {
   let id = 0;
-  return async function rpc(method, params) {
-    if (id >= maxCalls) throw new CheckError('The comparison needed more than ' + maxCalls + ' RPC calls', 'too-large');
-    const requestId = ++id;
-    const payload = JSON.stringify({ jsonrpc: '2.0', id: requestId, method, params });
-    const callSignal = AbortSignal.any([signal ?? AbortSignal.timeout(60000), AbortSignal.timeout(15000)]);
-    let text;
+  const budget = signal ?? AbortSignal.timeout(60000);
+  const wait = ms => new Promise((resolve, reject) => {
+    if (budget.aborted) return reject(new CheckError('X Layer RPC timed out', 'rpc-timeout'));
+    const timer = setTimeout(resolve, ms);
+    budget.addEventListener('abort', () => { clearTimeout(timer); reject(new CheckError('X Layer RPC timed out', 'rpc-timeout')); }, { once: true });
+  });
+
+  // One HTTP exchange. Rate limits and gateway errors are marked retryable; everything else is final.
+  async function send(payload) {
+    const callSignal = AbortSignal.any([budget, AbortSignal.timeout(15000)]);
     try {
       if (transport === 'curl') {
+        // Loaded only when requested, so runtimes without child processes (Workers) never touch it.
+        const [{ execFile }, { promisify }] = await Promise.all([import('node:child_process'), import('node:util')]);
         const { stdout } = await promisify(execFile)('curl', [
           '--disable', '--silent', '--show-error', '--fail', '--max-time', '14', '--max-filesize', String(MAX_RESPONSE_BYTES),
           '--header', 'content-type: application/json', '--data-binary', payload, '--', url,
         ], { signal: callSignal, maxBuffer: MAX_RESPONSE_BYTES });
-        text = stdout;
-      } else {
-        const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: payload, signal: callSignal });
-        if (!response.ok) throw new CheckError('X Layer RPC returned HTTP ' + response.status, 'rpc-unavailable');
-        text = await readLimited(response, MAX_RESPONSE_BYTES);
+        return { text: stdout };
       }
+      const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: payload, signal: callSignal });
+      if (!response.ok) {
+        await response.body?.cancel();
+        const error = new CheckError('X Layer RPC returned HTTP ' + response.status, 'rpc-unavailable');
+        if (RETRY_STATUS.has(response.status)) return { retry: error, after: Number(response.headers.get('retry-after')) };
+        throw error;
+      }
+      return { text: await readLimited(response, MAX_RESPONSE_BYTES) };
     } catch (error) {
       if (error instanceof CheckError) throw error;
       if (error.code === 'ENOENT') throw new CheckError('The curl RPC transport requires curl to be installed', 'rpc-unavailable');
       const timedOut = error.name === 'TimeoutError' || error.name === 'AbortError' || error.killed;
       throw new CheckError(timedOut ? 'X Layer RPC timed out' : 'X Layer RPC could not be reached', timedOut ? 'rpc-timeout' : 'rpc-unavailable');
     }
-    let body;
-    try { body = JSON.parse(text); } catch { throw new CheckError('X Layer RPC returned a response that is not JSON', 'rpc-unavailable'); }
-    if (body?.error) throw rpcError(body.error, url);
-    if (body?.id !== requestId || body.result === undefined) throw new CheckError('X Layer RPC returned no result', 'rpc-unavailable');
-    return body.result;
+  }
+
+  return async function rpc(method, params) {
+    if (id >= maxCalls) throw new CheckError('The comparison needed more than ' + maxCalls + ' RPC calls', 'too-large');
+    const requestId = ++id;
+    const payload = JSON.stringify({ jsonrpc: '2.0', id: requestId, method, params });
+    for (let attempt = 1; ; attempt++) {
+      const { text, retry, after } = await send(payload);
+      let body;
+      if (!retry) {
+        try { body = JSON.parse(text); } catch { throw new CheckError('X Layer RPC returned a response that is not JSON', 'rpc-unavailable'); }
+      }
+      const limited = retry ?? (body?.error && (body.error.code === -32005 || /rate limit|too many requests/i.test(body.error.message ?? ''))
+        ? new CheckError('X Layer RPC rate limit: ' + redact(body.error.message, url), 'rpc-unavailable') : null);
+      if (limited) {
+        if (attempt >= RETRY_ATTEMPTS) throw limited;
+        // Honor Retry-After up to 2 s, otherwise back off exponentially with jitter.
+        const delay = after > 0 ? Math.min(after * 1000, 2000) : retryDelayMs * 3 ** (attempt - 1) * (0.75 + Math.random() / 2);
+        await wait(delay);
+        continue;
+      }
+      if (body?.error) throw rpcError(body.error, url);
+      if (body?.id !== requestId || body.result === undefined) throw new CheckError('X Layer RPC returned no result', 'rpc-unavailable');
+      return body.result;
+    }
   };
 }
 
@@ -107,7 +138,10 @@ async function readLimited(response, limit) {
     }
     chunks.push(value);
   }
-  return Buffer.concat(chunks).toString('utf8');
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  return new TextDecoder().decode(bytes);
 }
 
 function rpcError(error, url) {

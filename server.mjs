@@ -1,9 +1,10 @@
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
-import { compareOnChain, reference, parseBlock, createRpc, defaultRpc, CheckError } from './src/xlayer.mjs';
-import { renderMarkdown } from './src/markdown.mjs';
+import { defaultRpc } from './src/xlayer.mjs';
+import { renderDocsPage } from './src/markdown.mjs';
 import { VERSION } from './src/report.mjs';
+import { createApi, SECURITY_HEADERS, WEB_LIMITS } from './src/api.mjs';
 
 const config = {
   port: Number(process.env.PORT ?? 4173),
@@ -12,9 +13,8 @@ const config = {
   maxActive: Number(process.env.PINCHECK_MAX_CONCURRENCY ?? 4),
   trustProxy: process.env.PINCHECK_TRUST_PROXY === '1',
 };
-// The public workbench answers within seconds; the CLI and GitHub Action allow wider circuits.
-export const WEB_LIMITS = { maxExhaustiveBits: 24, maxWork: 2 ** 28, sampleWords: 2 ** 13, deadlineMs: 20000 };
-const TRANSIENT = new Set(['rpc-unavailable', 'rpc-timeout', 'rpc-error', 'historical-state-unavailable', 'block-changed', 'time-budget', 'error']);
+export { WEB_LIMITS };
+const api = createApi({ rpc: config.rpc, maxActive: config.maxActive, log: event => console.log(JSON.stringify(event)) });
 const root = new URL('./', import.meta.url);
 const STATIC = {
   '/': ['web/index.html', 'text/html'],
@@ -58,49 +58,13 @@ async function compressed(file, data) {
   return body;
 }
 
-const HEADERS = {
-  'x-content-type-options': 'nosniff',
-  'referrer-policy': 'no-referrer',
-  'content-security-policy': "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
-};
-
-const cache = new Map();          // pinned comparison results, LRU by insertion order
-const inflight = new Map();       // identical requests share one run
-const activeByClient = new Map();
-let active = 0;
-const CACHE_SIZE = 200;
-
-function remember(key, report) {
-  cache.delete(key);
-  cache.set(key, report);
-  if (cache.size > CACHE_SIZE) cache.delete(cache.keys().next().value);
-}
-
-async function runCompare(baseline, candidate, block) {
-  const pinned = block.hash ? baseline.address + ':' + baseline.id + '|' + candidate.address + ':' + candidate.id + '|' + block.hash : null;
-  if (pinned && cache.has(pinned)) return { report: cache.get(pinned), cache: 'hit' };
-  const key = baseline.address + ':' + baseline.id + '|' + candidate.address + ':' + candidate.id + '|' + (block.hash ?? block.number ?? 'latest');
-  if (inflight.has(key)) return { report: await inflight.get(key), cache: 'shared' };
-  const promise = compareOnChain(baseline, candidate, { url: config.rpc, block: block.hash ?? block.number ?? 'latest', limits: WEB_LIMITS });
-  inflight.set(key, promise);
-  try {
-    const report = await promise;
-    if (report.block?.hash && !TRANSIENT.has(report.code)) {
-      remember(baseline.address + ':' + baseline.id + '|' + candidate.address + ':' + candidate.id + '|' + report.block.hash, report);
-    }
-    return { report, cache: 'miss' };
-  } finally {
-    inflight.delete(key);
-  }
-}
+const HEADERS = SECURITY_HEADERS;
 
 let docs;
 async function docsPage() {
   if (docs && process.env.NODE_ENV === 'production') return docs;
   const [template, source] = await Promise.all([readFile(new URL('web/docs.html', root), 'utf8'), readFile(new URL('docs/install.md', root), 'utf8')]);
-  const { html, toc } = renderMarkdown(source.replace(/^# .*\n/, ''));
-  const nav = toc.map(({ id, text }) => '<li><a href="#' + id + '">' + text + '</a></li>').join('');
-  docs = template.replace('<!--TOC-->', nav).replace('<!--DOCS-->', html).replace(/\{\{VERSION\}\}/g, VERSION);
+  docs = renderDocsPage(template, source, VERSION);
   return docs;
 }
 
@@ -113,54 +77,15 @@ function clientOf(req) {
 }
 
 export const server = createServer(async (req, res) => {
-  const started = Date.now();
   const send = (status, body, type = 'application/json', extra = {}) => {
     res.writeHead(status, { ...HEADERS, 'content-type': TEXT.test(type) || type === 'text/javascript' ? type + '; charset=utf-8' : type, 'cache-control': 'no-store', ...extra });
     res.end(req.method === 'HEAD' ? undefined : typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
   };
   try {
     const { pathname, searchParams } = new URL(req.url, 'http://localhost');
+    const result = await api.handle(req.method, pathname, searchParams, clientOf(req));
+    if (result) return send(result.status, result.body, 'application/json', result.headers ?? {});
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(405, { reason: 'Use GET', code: 'method' }, 'application/json', { allow: 'GET, HEAD' });
-
-    if (pathname === '/api/health') {
-      const body = { ok: true, version: VERSION, rpc: config.rpc === defaultRpc ? defaultRpc : 'configured', active, cached: cache.size };
-      if (searchParams.get('deep') === '1') {
-        try {
-          const chain = await createRpc(config.rpc, { signal: AbortSignal.timeout(5000) })('eth_chainId', []);
-          body.chainId = Number(BigInt(chain));
-          if (body.chainId !== 196) throw new CheckError('wrong chain', 'wrong-chain');
-        } catch (error) {
-          return send(503, { ...body, ok: false, rpcError: error.code ?? 'error' });
-        }
-      }
-      return send(200, body);
-    }
-
-    if (pathname === '/api/compare') {
-      let baseline, candidate, block;
-      try {
-        baseline = reference(searchParams.get('baseline'));
-        candidate = reference(searchParams.get('candidate'));
-        block = parseBlock(searchParams.get('block'));
-      } catch (error) {
-        return send(400, { reason: error.message, code: 'invalid-input' });
-      }
-      const client = clientOf(req);
-      if (active >= config.maxActive || (activeByClient.get(client) ?? 0) >= 1) {
-        return send(429, { reason: 'PinCheck is busy with another comparison. Try again in a few seconds.', code: 'busy' }, 'application/json', { 'retry-after': '5' });
-      }
-      active++;
-      activeByClient.set(client, (activeByClient.get(client) ?? 0) + 1);
-      try {
-        const { report, cache: cacheState } = await runCompare(baseline, candidate, block);
-        console.log(JSON.stringify({ at: new Date().toISOString(), event: 'compare', status: report.status, code: report.code, ms: Date.now() - started, cache: cacheState }));
-        return send(200, report, 'application/json', { 'x-pincheck-cache': cacheState });
-      } finally {
-        active--;
-        const remaining = activeByClient.get(client) - 1;
-        if (remaining) activeByClient.set(client, remaining); else activeByClient.delete(client);
-      }
-    }
 
     if (pathname === '/docs' || pathname === '/docs/') return send(200, await docsPage(), 'text/html', { 'cache-control': 'no-cache' });
     const found = resolveStatic(pathname);

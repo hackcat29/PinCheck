@@ -2,7 +2,22 @@
 
 The workbench is one Node.js process with no dependencies and no database. It reads X Layer through a JSON-RPC endpoint and keeps a small in-memory cache, so any host that runs Node.js 22 or a container works. The GitHub Action does not depend on it.
 
-## Launch
+## Cloudflare Workers (the public site)
+
+The public site at https://pincheck.kiwiprotocol.workers.dev is a Cloudflare Worker with static assets:
+
+```sh
+npm install          # installs wrangler, the only dev dependency
+npm run deploy       # node scripts/build-site.mjs && wrangler deploy
+```
+
+- `scripts/build-site.mjs` writes `dist/`: the site with the version filled in, `/docs` rendered from `docs/install.md`, the recorded examples, the vendored libraries, a 404 page, and a `_headers` file with the CSP and caching rules.
+- `wrangler.jsonc` routes only `/api/*` to `worker.mjs` (`run_worker_first`); every other request is a static asset, which Cloudflare compresses and caches.
+- `worker.mjs` uses the same `src/api.mjs` as the Node server, so validation, per-client limits, the pinned-result cache and response headers are identical. The cache lives per Worker isolate.
+- Set `X_LAYER_RPC` with `npx wrangler secret put X_LAYER_RPC` to use a private endpoint. `PINCHECK_MAX_CONCURRENCY` is a plain variable in `wrangler.jsonc`.
+- `npm run dev:worker` runs the same build in the local Workers runtime on port 8787. `npx wrangler tail` streams production logs; `npx wrangler rollback` restores the previous version.
+
+## Launch on your own server
 
 ```sh
 NODE_ENV=production HOST=0.0.0.0 PORT=8080 node server.mjs
@@ -43,6 +58,8 @@ The server writes one JSON line per comparison (`status`, `code`, duration, cach
 The workbench evaluates up to 24 input bits exhaustively within 2^28 gate-word operations and a 20-second evaluation budget. Every comparison also has a 60-second RPC budget, 15 seconds per call, 400 calls and 2.5 MB per response. Requests are capped at 75 seconds. Comparisons pinned to a block hash are cached (200 entries), and identical requests in flight share one run.
 
 ## Runbook: the RPC is failing
+
+PinCheck retries HTTP 429, 502, 503 and 504 and JSON-RPC rate-limit errors up to three times per call, honoring `Retry-After`, before giving up. Public endpoints rate-limit shared egress addresses such as Cloudflare's, so occasional retries are normal.
 
 Symptoms: comparisons return **Inconclusive** with `rpc-unavailable`, `rpc-timeout` or `rpc-error`, and `/api/health?deep=1` returns `503`.
 

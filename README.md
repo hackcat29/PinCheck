@@ -2,6 +2,8 @@
 
 **Catch breaking TapeOut circuit upgrades before they ship.**
 
+Live: **https://pincheck.kiwiprotocol.workers.dev**
+
 PinCheck is a required GitHub check for X Layer apps that call [TapeOut](https://tapeout.net/) circuits. Pin the circuits your app calls in `pincheck.json`. When a pull request proposes a different circuit, PinCheck compares every input of both circuits at one X Layer block, replays the first difference on the deployed processors, and blocks the merge with the input that proves it.
 
 A real example from this repository, [pull request #1](https://github.com/hackcat29/PinCheck/pull/1) ([check run](https://github.com/hackcat29/PinCheck/actions/runs/44116618733)):
@@ -69,7 +71,7 @@ Measured on mainnet circuits from the projects below: Neon Reliquary's 20-input 
 
 ## Use it locally
 
-Node.js 22 or newer. No dependencies.
+Node.js 22 or newer. PinCheck has no runtime dependencies; `wrangler` is a dev dependency used only to deploy.
 
 ```sh
 npm start                     # workbench on http://localhost:4173
@@ -81,7 +83,7 @@ node cli.mjs 0x57F319CF056F72F48cF1dbb670F2A3DB007Aa355:1 0x57F319CF056F72F48cF1
 
 The CLI prints a JSON report and exits `0` (compatible), `1` (behavior or interface changed) or `2` (inconclusive or invalid input). `node cli.mjs gate --base A.json --head B.json` runs the same gate as the action. Set `X_LAYER_RPC` for another endpoint; credentials in it never appear in output.
 
-The site opens on the two real netlists from pull request #1, rendered in 3D with three.js on WebGPU (WebGL 2 where WebGPU is unavailable); flip the input bits to see where the circuits disagree. Further down, the browser evaluates all 1,048,576 inputs of a 20-input circuit pair with a TypeGPU compute shader (or the CPU) and checks the count against the recorded report. The workbench opens on recorded evidence, reruns it live, compares any two circuits, and opens saved reports (including the `pincheck-report` artifact from a GitHub run) in the browser without an RPC. Agents can start from [`/llms.txt`](web/llms.txt). Deployment, environment variables, health checks and the RPC outage runbook are in [docs/deploy.md](docs/deploy.md).
+The site opens on the two real netlists from pull request #1, rendered in 3D with three.js on WebGPU (WebGL 2 where WebGPU is unavailable); flip the input bits to see where the circuits disagree. Further down, the browser evaluates all 1,048,576 inputs of a 20-input circuit pair with a TypeGPU compute shader (or the CPU) and checks the count against the recorded report. The workbench opens on recorded evidence, reruns it live, compares any two circuits, and opens saved reports (including the `pincheck-report` artifact from a GitHub run) in the browser without an RPC. Agents can start from [`/llms.txt`](web/llms.txt). The public site runs on Cloudflare Workers: `npm run deploy` builds `dist/` and deploys `worker.mjs`, which serves `/api/*` through the same API module as `server.mjs` and leaves every other path to static assets. Deployment, environment variables, health checks and the RPC outage runbook are in [docs/deploy.md](docs/deploy.md).
 
 ## Layout
 
@@ -92,7 +94,8 @@ The site opens on the two real netlists from pull request #1, rendered in 3D wit
 | `src/manifest.mjs`, `src/gate.mjs`, `src/summary.mjs` | `pincheck.json`, the release gate, the GitHub job summary |
 | `src/report.mjs` | Decision, coverage, guarantee and next-step wording shared by the CLI, summary and browser |
 | `action.yml`, `action/` | The composite GitHub Action |
-| `server.mjs`, `web/` | Site, workbench and docs |
+| `server.mjs`, `web/` | Site, workbench and docs (Node) |
+| `src/api.mjs`, `worker.mjs`, `wrangler.jsonc` | The HTTP API shared by Node and Cloudflare, and the Worker that serves it with the static site built by `scripts/build-site.mjs` |
 | `web/landing/` | Landing page modules: the 3D netlist scene (three.js), the input-space map (TypeGPU), and the shared netlist evaluator they use |
 | `web/vendor/` | three.js 0.187, TypeGPU 0.12 and the Geist fonts, bundled and served by PinCheck itself. Rebuild with `npm run vendor`; hashes and licenses are recorded next to them |
 | `scripts/` | `vendor.mjs` rebuilds `web/vendor`; `record-netlists.mjs` rereads the example netlists from X Layer and checks them against the recorded fingerprints |
@@ -105,12 +108,12 @@ Every check below was run on 2026-11-17 for v0.2.0 and passed, or returned the r
 
 ### Deterministic tests (`npm test`, no network)
 
-60 of 60 pass locally; the 55 that existed at v0.2.0 also pass in GitHub Actions.
+63 of 63 pass locally; the 55 that existed at v0.2.0 also pass in GitHub Actions.
 
 | File | Tests | Covers |
 |---|---|---|
 | `test/compare.test.mjs` | 17 | NAND/REF semantics, multi-output REF order, LSB-first packing, interface mismatch, malformed and self-referencing netlists, undeclared state, gate-count mismatch, 2^20 and 2^22 exhaustive search (a single differing input among 4,194,304 found exactly), sampling that can fail but never pass, identical stateful circuits, size and REF-depth limits |
-| `test/xlayer.test.mjs` | 17 | Replay ABI encoding, EIP-1898 pinning and its fallback, spot-checks, replay disagreement, replay unavailable after a real mismatch, RPC down, wrong chain, unregistered processor, missing circuit, reorg during a run, historical state errors, credential redaction, response size cap, input parsing |
+| `test/xlayer.test.mjs` | 20 | Replay ABI encoding, EIP-1898 pinning and its fallback, spot-checks, replay disagreement, replay unavailable after a real mismatch, RPC down, wrong chain, unregistered processor, missing circuit, reorg during a run, historical state errors, credential redaction, response size cap, input parsing, bounded retries on rate limits |
 | `test/gate.test.mjs` | 13 | Manifest validation, legacy manifests, pass/fail/inconclusive exit codes, acceptChange bound to one transition and refused for failed runs, added/removed/multiple dependencies, summary content with bit names, CLI exit codes |
 | `test/web.test.mjs` | 4 | Landing-page evidence matches the recorded report, recorded examples match the captured v0.1 fingerprints, Markdown escaping, server validation, 429 under load and cache hits |
 | `test/docs.test.mjs` | 4 | Install snippets, README, example layout and ruleset stay in sync |
@@ -200,6 +203,17 @@ Checked on 2026-11-17 with Playwright in headless Chrome (WebGPU on Apple Metal)
 - **Accessibility and layout:** no axe-core violations on the landing page or docs at 1440 px and 390 px. Neither width has horizontal scrolling or a touch target under 24 px. With reduced motion, all content is visible.
 - **Tests:** the netlists, the browser evaluator's counts, the GPU program layout, vendored file hashes and the new static routes are covered by `test/site.test.mjs`.
 
+### Production on Cloudflare Workers
+
+Checked on 2026-11-17 at https://pincheck.kiwiprotocol.workers.dev (Worker startup 6 ms):
+
+- **Health:** `/api/health?deep=1` reports chain 196.
+- **PR examples:** #1 → #11 is Behavior changed (input `0x01`, replay confirmed). #1 → #2 at the recorded block hash is Compatible.
+- **Heavy comparisons:** Neon Reliquary #5 vs #7 checks 1,048,576 inputs, 131,072 differ, replay confirmed. Fusebox #15 vs itself checks all 16,777,216 inputs and is Compatible. #15 → #18 is Interface mismatch.
+- **Rate limiting:** the public RPC rate-limited about one comparison in three from Cloudflare's network until PinCheck retried HTTP 429/502/503/504 and JSON-RPC rate-limit errors. A burst of eight back-to-back comparisons then all completed. A permanently rate-limited RPC still ends Inconclusive after at most three attempts per call (covered by tests).
+- **Browser suite:** the same suite as above passed against production, with WebGPU and GPU compute, the WebGL 2 and CPU fallback, and no axe violations at 1440 px and 390 px.
+- **Headers and compression:** static files carry the same CSP and security headers through `_headers`, and three.js is served Brotli-compressed (about 317 KB).
+
 ### Evaluator speed
 
 Two comparisons of every input, locally, before chain reads:
@@ -219,7 +233,6 @@ Two comparisons of every input, locally, before chain reads:
 - A `merge_group` run.
 - How GitHub renders the job summary: summaries are not visible to signed-out browsers. The Markdown itself is covered by tests.
 - A workflow that uses `@v0.2.0` by tag: the tag resolves and serves `action.yml`, but runs so far used the commit SHA.
-- A hosted deployment of the workbench.
 
 ## Credits and references
 

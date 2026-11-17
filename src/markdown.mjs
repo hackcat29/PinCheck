@@ -64,3 +64,10 @@ export function renderMarkdown(source) {
   }
   return { html: out.join('\n'), toc };
 }
+
+// The /docs page: docs/install.md rendered into web/docs.html.
+export function renderDocsPage(template, markdown, version) {
+  const { html, toc } = renderMarkdown(markdown.replace(/^# .*\n/, ''));
+  const nav = toc.map(({ id, text }) => '<li><a href="#' + id + '">' + text + '</a></li>').join('');
+  return template.replace('<!--TOC-->', nav).replace('<!--DOCS-->', html).replace(/\{\{VERSION\}\}/g, version);
+}

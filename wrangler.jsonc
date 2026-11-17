@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pincheck",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-15",
+  "compatibility_flags": ["nodejs_compat"],
+  // Static site built by `npm run build`; only /api/* reaches the Worker.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "vars": {
+    "PINCHECK_MAX_CONCURRENCY": "4"
+  },
+  // X_LAYER_RPC is optional; set it with `npx wrangler secret put X_LAYER_RPC` if the endpoint holds a key.
+  "observability": { "enabled": true }
+}
