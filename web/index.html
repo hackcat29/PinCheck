@@ -3,36 +3,123 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PinCheck — TapeOut circuit compatibility</title>
+  <title>PinCheck: catch breaking TapeOut circuit upgrades</title>
+  <meta name="description" content="PinCheck pins the TapeOut circuits your X Layer app calls and fails the pull request when a proposed upgrade changes an output, with the exact input that proves it.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.mjs"></script>
 </head>
 <body>
-  <header><a class="brand" href="/">Pin<span>Check</span></a><span class="network">X Layer mainnet</span></header>
-  <main>
-    <h1>Check a circuit<br>before you switch.</h1>
-    <p class="intro">Compare two deployed TapeOut circuits. See exactly which input changes the output before you upgrade your app.</p>
-    <form>
-      <h2>Compare circuits</h2>
-      <p class="hint">Enter each processor address followed by a colon and circuit ID.</p>
-      <div class="fields">
-        <label>Current circuit<input name="baseline" placeholder="0x…:1" autocomplete="off" spellcheck="false" required></label>
-        <label>Candidate circuit<input name="candidate" placeholder="0x…:2" autocomplete="off" spellcheck="false" required></label>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site">
+    <div class="wrap bar">
+      <a class="brand" href="/" aria-label="PinCheck home"><span class="mark" aria-hidden="true"></span>PinCheck</a>
+      <nav aria-label="Primary">
+        <a href="/#compare">Compare</a>
+        <a href="/docs">Docs</a>
+        <a href="https://github.com/hackcat29/PinCheck">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero-title">
+        <p class="eyebrow">For X Layer apps that call TapeOut circuits</p>
+        <h1 id="hero-title">Catch breaking TapeOut circuit upgrades before they ship.</h1>
       </div>
-      <div class="actions"><button type="submit">Run comparison</button><button class="secondary" type="button" id="example">Try a live mismatch</button><button class="secondary" type="button" id="match-example">Try a compatible pair</button></div>
-    </form>
-    <section id="results" aria-live="polite" hidden>
-      <div class="result-head"><h2 id="status"></h2><button id="download" class="secondary" hidden>Download JSON</button></div>
-      <p id="detail"></p>
-      <dl id="metadata"></dl>
-      <div id="mismatch" hidden>
-        <h3>First different output</h3>
-        <dl id="outputs"></dl>
-        <p id="replay"></p>
+      <div class="hero-body">
+        <p class="lede">Pin the circuits your app calls. When a pull request proposes a new one, PinCheck checks every input at one X Layer block, replays the first difference on the deployed processors, and fails the check with the input that proves it.</p>
+        <div class="cta">
+          <a class="button primary" href="/docs#install">Add to your repo</a>
+          <a class="button" href="#compare" data-focus-form>Compare your circuits</a>
+        </div>
       </div>
-      <a id="permalink" hidden>Replay this comparison</a>
+
+      <figure class="pr-card" aria-labelledby="pr-title">
+        <figcaption class="pr-head">
+          <span class="tag">Real pull request</span>
+          <a id="pr-title" href="https://github.com/hackcat29/PinCheck/pull/1">#1 Replace OrderGuard circuit #1 with #11</a>
+        </figcaption>
+        <dl class="evidence-row">
+          <div><dt>Input</dt><dd>0x01</dd></div>
+          <div><dt>Current #1</dt><dd>0x01</dd></div>
+          <div><dt>Candidate #11</dt><dd class="changed">0x00</dd></div>
+          <div><dt>Replay</dt><dd class="plain">Confirmed by both processors</dd></div>
+        </dl>
+        <p class="check" data-status="behavior-changed">
+          <span class="glyph" aria-hidden="true">✕</span>
+          <span><strong>PinCheck / Circuit compatibility</strong> failed. The required check blocked the merge.</span>
+          <a href="https://github.com/hackcat29/PinCheck/actions/runs/44116618733">Run log</a>
+        </p>
+        <div class="diff" aria-label="Change in demo/circuit.json">
+          <p class="file">demo/circuit.json</p>
+          <pre><code><span class="del">-  "circuit": "0x57F3…a355:1"</span>
+<span class="add">+  "circuit": "0x57F3…a355:11"</span></code></pre>
+        </div>
+        <p class="provenance">4 of 4 inputs checked at X Layer block 76,160,736. <a href="/?example=orderguard-1-to-11#compare">Open the full report</a></p>
+      </figure>
     </section>
-    <footer>Exhaustive comparison for stateless circuits with up to eight input bits. <a href="https://github.com/TapeOutProtocol/TAPs/blob/main/TAPs/TAP-02.md">TapeOut specification</a></footer>
+
+    <section class="how wrap" aria-labelledby="how-title">
+      <h2 id="how-title" class="visually-hidden">How PinCheck works</h2>
+      <ol>
+        <li><h3>Pin</h3><p>List the circuits your app calls in <code>pincheck.json</code>, as processor address and circuit ID.</p></li>
+        <li><h3>Compare</h3><p>Every input of both circuits is evaluated at one block hash: all 2<sup>n</sup> inputs, up to 26 input bits in CI.</p></li>
+        <li><h3>Replay</h3><p>The first difference is sent to both deployed processors with <code>eval</code>. If a processor disagrees with PinCheck, the check fails.</p></li>
+        <li><h3>Gate</h3><p>A required GitHub check blocks the merge. An intended change is approved in the manifest, with a reason.</p></li>
+      </ol>
+    </section>
+
+    <section id="compare" class="workbench wrap" aria-labelledby="compare-title">
+      <div class="section-head">
+        <h2 id="compare-title">Compare</h2>
+        <p>Start from recorded evidence, rerun it live on X Layer, or check your own circuits.</p>
+      </div>
+      <div class="examples" role="group" aria-label="Recorded examples" id="examples"></div>
+      <div class="bench">
+        <div class="report-column">
+          <div id="notice" class="notice" tabindex="-1" hidden></div>
+          <article id="report" class="report" aria-live="polite" aria-busy="true">
+            <p class="empty">Loading the recorded example…</p>
+          </article>
+        </div>
+        <form id="compare-form" class="panel" novalidate aria-labelledby="form-title">
+          <h3 id="form-title">Compare your circuits</h3>
+          <div class="field">
+            <label for="baseline">Current circuit</label>
+            <input id="baseline" name="baseline" autocomplete="off" spellcheck="false" inputmode="text" placeholder="0x57F3…a355:1" aria-describedby="baseline-help baseline-error" required>
+            <p class="help" id="baseline-help">The circuit your app calls today: processor address, a colon, circuit ID.</p>
+            <p class="error" id="baseline-error" hidden></p>
+          </div>
+          <div class="field">
+            <label for="candidate">Candidate circuit</label>
+            <input id="candidate" name="candidate" autocomplete="off" spellcheck="false" placeholder="0x57F3…a355:11" aria-describedby="candidate-help candidate-error" required>
+            <p class="help" id="candidate-help">The circuit you want to switch to.</p>
+            <p class="error" id="candidate-error" hidden></p>
+          </div>
+          <details class="field">
+            <summary>Block (optional)</summary>
+            <label for="block" class="visually-hidden">Block</label>
+            <input id="block" name="block" autocomplete="off" spellcheck="false" placeholder="latest" aria-describedby="block-help block-error">
+            <p class="help" id="block-help">A block number or hash. Older blocks need an RPC that keeps historical state.</p>
+            <p class="error" id="block-error" hidden></p>
+          </details>
+          <button type="submit" class="button primary">Compare on X Layer</button>
+          <p class="help">Reads X Layer mainnet without a wallet. The web check covers up to 24 input bits; the CLI and GitHub Action cover 26.</p>
+          <div class="open-file">
+            <label for="open-report">Open a saved report</label>
+            <input id="open-report" type="file" accept="application/json,.json" aria-describedby="open-help">
+            <p class="help" id="open-help">JSON from the CLI, this page, or a GitHub run artifact. It is read in your browser and not uploaded.</p>
+          </div>
+        </form>
+      </div>
+    </section>
   </main>
+
+  <footer class="site wrap">
+    <p>PinCheck {{VERSION}} · TapeOut <a href="https://github.com/TapeOutProtocol/TAPs/blob/main/TAPs/TAP-02.md">TAP-02</a> netlists on X Layer mainnet (chain 196) · Examples use the public <a href="https://github.com/0xdopewilly/fusebox#live-on-x-layer-mainnet-chain-196">OrderGuard</a> and <a href="https://github.com/tizerluo/neon-reliquary-xlayer/blob/main/docs/XLAYER-MAINNET.md">Neon Reliquary</a> deployments, which PinCheck does not own.</p>
+  </footer>
 </body>
 </html>

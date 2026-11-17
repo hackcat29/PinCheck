@@ -54,7 +54,7 @@ export function guaranteeFor(report) {
     return 'Every one of the ' + formatCount(c.space) + ' possible inputs produces the same outputs from both circuits. ' + scope;
   }
   if (report.status === 'behavior-changed') {
-    return 'At least one input produces different outputs, so the candidate is not a drop-in replacement. The counterexample below is reproducible at ' + blockText(report) + '.';
+    return 'At least one input produces different outputs, so the candidate is not a drop-in replacement. The counterexample is reproducible at ' + blockText(report) + '.';
   }
   if (report.status === 'interface-mismatch') {
     return 'The circuits have different input or output widths, so the candidate cannot replace the current circuit without changing the calling code.';
@@ -71,7 +71,7 @@ export function headline(report) {
   if (report.status === 'compatible') return coverage(report) + '. No output differs.';
   if (report.status === 'interface-mismatch') {
     const { baseline: b, candidate: n } = report.interface ?? {};
-    return 'Current circuit takes ' + b?.nIn + ' inputs and returns ' + b?.nOut + ' outputs. The candidate takes ' + n?.nIn + ' and returns ' + n?.nOut + '.';
+    return 'The current circuit takes ' + bits(b?.nIn, 'input') + ' and returns ' + bits(b?.nOut, 'output') + '. The candidate takes ' + bits(n?.nIn, 'input') + ' and returns ' + bits(n?.nOut, 'output') + '.';
   }
   return report.reason ? sentence(report.reason) : 'The comparison did not complete.';
 }
@@ -121,6 +121,7 @@ export function cliCommand(report) {
 export const refText = ref => ref ? ref.address + ':' + ref.id : '';
 export const shortAddress = address => address ? address.slice(0, 6) + '…' + address.slice(-4) : '';
 export const shortRef = ref => ref ? shortAddress(ref.address) + ' #' + ref.id : '';
+const bits = (count, noun) => count + ' ' + noun + (count === 1 ? ' bit' : ' bits');
 const sentence = text => /[.!?]$/.test(text) ? text : text + '.';
 
 // Bit-level view of a counterexample, with names when the manifest declares them. Vectors are LSB-first.

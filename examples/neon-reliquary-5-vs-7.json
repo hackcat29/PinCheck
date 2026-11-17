@@ -5,7 +5,7 @@
     "version": "0.2.0"
   },
   "status": "behavior-changed",
-  "guarantee": "At least one input produces different outputs, so the candidate is not a drop-in replacement. The counterexample below is reproducible at X Layer block 76,163,385.",
+  "guarantee": "At least one input produces different outputs, so the candidate is not a drop-in replacement. The counterexample is reproducible at X Layer block 76,163,385.",
   "baseline": {
     "address": "0x57e9e1111f42f448126a9f12b2b3f99a79dd1a44",
     "id": "5"
@@ -116,5 +116,5 @@
   "rpc": {
     "endpoint": "https://rpc.xlayer.tech"
   },
-  "generatedAt": "2026-11-17T16:20:28.101Z"
+  "generatedAt": "2026-11-17T16:29:51.915Z"
 }
