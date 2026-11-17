@@ -10,6 +10,8 @@
     "test": "node --test \"test/*.test.mjs\"",
     "test:live": "node --test \"smoke/*.test.mjs\"",
     "start": "node server.mjs",
-    "check": "node cli.mjs"
+    "check": "node cli.mjs",
+    "vendor": "node scripts/vendor.mjs",
+    "netlists": "node scripts/record-netlists.mjs"
   }
 }

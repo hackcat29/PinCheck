@@ -10,6 +10,7 @@ const REF = /^\s*0x[0-9a-fA-F]{40}:[1-9][0-9]{0,19}\s*$/;
 const BLOCK = /^\s*(latest|[0-9]{1,19}|0x[0-9a-fA-F]{1,16}|0x[0-9a-fA-F]{64})?\s*$/;
 const GLYPH = { compatible: '✓', 'behavior-changed': '✕', 'interface-mismatch': '≠', inconclusive: '?' };
 const TRANSIENT = new Set(['rpc-unavailable', 'rpc-timeout', 'rpc-error', 'historical-state-unavailable', 'block-changed', 'time-budget', 'busy', 'network']);
+const MAX_LEDS = 64;
 
 let examples = [];
 let current = null;   // { report, source: {kind, example?, file?}, labels? }
@@ -36,139 +37,180 @@ function render(entry) {
   current = entry;
   const r = entry.report;
   const c = r.comparison ?? {};
-  const m = c.firstMismatch;
-  const replay = r.replay ?? {};
   reportEl.setAttribute('aria-busy', 'false');
   reportEl.dataset.status = r.status;
+  reportEl.classList.remove('enter');
+  void reportEl.offsetWidth;
+  reportEl.classList.add('enter');
 
-  const source = sourceLine(entry);
   const head = h('header', { class: 'report-head' },
-    source,
+    sourceLine(entry),
     h('h3', { class: 'decision', 'data-status': r.status, tabindex: '-1', id: 'decision' },
       h('span', { class: 'glyph', 'aria-hidden': 'true' }, GLYPH[r.status] ?? '?'), DECISIONS[r.status] ?? r.status),
     h('p', { class: 'headline' }, headline(r)),
-    h('p', { class: 'pair' }, mono(shortRef(r.baseline)), h('span', { 'aria-hidden': 'true' }, ' → '), h('span', { class: 'visually-hidden' }, ' to '), mono(shortRef(r.candidate))),
+    h('p', { class: 'pair' }, mono(shortRef(r.baseline)), h('span', { 'aria-hidden': 'true' }, '→'), h('span', { class: 'visually-hidden' }, ' to '), mono(shortRef(r.candidate))),
   );
-
-  const facts = m ? h('dl', { class: 'evidence-row' },
-    fact('Input', m.packedInput),
-    fact('Current output', m.baselineOutput),
-    fact('Candidate output', m.candidateOutput, 'changed'),
-    fact('Replay', REPLAY[replay.status] ?? '—', 'plain'),
-  ) : r.status === 'interface-mismatch' ? h('dl', { class: 'evidence-row' },
-    fact('Current inputs', r.interface?.baseline?.nIn), fact('Candidate inputs', r.interface?.candidate?.nIn, r.interface?.baseline?.nIn !== r.interface?.candidate?.nIn ? 'changed' : ''),
-    fact('Current outputs', r.interface?.baseline?.nOut), fact('Candidate outputs', r.interface?.candidate?.nOut, r.interface?.baseline?.nOut !== r.interface?.candidate?.nOut ? 'changed' : ''),
-  ) : null;
 
   const statuses = h('div', { class: 'statuses' },
-    statusLine('Local comparison', compareStatus(r), [c.method && METHODS[c.method], coverage(r), c.mismatches ? formatCount(c.mismatches) + ' differ' : null]),
-    statusLine('On-chain replay', REPLAY[replay.status] ?? 'Not run', [replayDetail(r)]),
+    pill('Local', compareStatus(r), [c.method && METHODS[c.method], coverage(r), c.mismatches ? formatCount(c.mismatches) + ' differ' : null], c.status === 'different' ? 'bad' : c.status === 'equivalent' ? 'ok' : ''),
+    pill('Replay', REPLAY[r.replay?.status] ?? 'Not run', [replayDetail(r)], r.replay?.status === 'confirmed' ? 'ok' : r.replay?.status === 'disagrees' ? 'bad' : ''),
   );
 
-  const next = h('div', { class: 'next' }, h('h4', {}, 'What to do next'), h('ul', {}, nextSteps(r).map(step => h('li', {}, step))));
+  const leds = c.firstMismatch ? ledBlock(r, entry.labels) : r.status === 'interface-mismatch' ? interfaceBlock(r) : null;
+  const next = h('p', { class: 'next' }, h('b', {}, 'Next'), ' ', nextSteps(r)[0]);
+
   const actions = h('div', { class: 'actions', role: 'group', 'aria-label': 'Report actions' },
-    r.baseline && h('button', { type: 'button', class: 'button primary', onclick: () => runLive({ baseline: refText(r.baseline), candidate: refText(r.candidate) }) }, 'Run live'),
-    r.block?.hash && h('button', { type: 'button', class: 'button', onclick: () => runLive({ baseline: refText(r.baseline), candidate: refText(r.candidate), block: r.block.hash }) }, 'Rerun at this block'),
-    h('button', { type: 'button', class: 'button', onclick: event => copy(event.currentTarget, shareLink()) }, 'Copy link'),
-    r.baseline && h('button', { type: 'button', class: 'button', onclick: event => copy(event.currentTarget, cliCommand(r)), title: 'Run from a clone of the PinCheck repository' }, 'Copy CLI command'),
-    h('button', { type: 'button', class: 'button', onclick: download }, 'Download JSON'),
+    r.baseline && h('button', { type: 'button', class: 'button primary small', onclick: () => runLive({ baseline: refText(r.baseline), candidate: refText(r.candidate) }) }, 'Run live'),
+    r.block?.hash && h('button', { type: 'button', class: 'button small', onclick: () => runLive({ baseline: refText(r.baseline), candidate: refText(r.candidate), block: r.block.hash }) }, 'Rerun at block'),
+    h('button', { type: 'button', class: 'button small', onclick: event => copy(event.currentTarget, shareLink()) }, 'Copy link'),
+    r.baseline && h('button', { type: 'button', class: 'button small', onclick: event => copy(event.currentTarget, cliCommand(r)), title: 'Run from a clone of the PinCheck repository' }, 'Copy CLI'),
+    h('button', { type: 'button', class: 'button small', onclick: download }, 'Download JSON'),
   );
 
-  reportEl.replaceChildren(head, facts ?? '', statuses, h('p', { class: 'guarantee' }, guaranteeFor(r)), next, actions,
-    m ? bitsTable(r, entry.labels) : '', evidenceList(r));
+  reportEl.replaceChildren(head, leds ?? '', statuses, next, actions, detailTabs(r, entry.labels));
 }
 
 function sourceLine(entry) {
   const r = entry.report;
-  const parts = [];
+  const line = h('p', { class: 'source' });
+  const add = (...nodes) => line.append(...nodes);
   if (entry.source.kind === 'example') {
     const ex = entry.source.example;
-    parts.push(h('span', { class: 'tag' }, 'Recorded'));
-    if (ex.pullRequest) parts.push(h('a', { href: ex.pullRequest }, 'Pull request #' + ex.pullRequest.split('/').pop()));
-    if (ex.run) parts.push(h('a', { href: ex.run }, 'GitHub check run'));
-    if (ex.original) parts.push(h('a', { href: ex.original.replace('..', '') }, 'Original report'));
-    if (ex.source) parts.push(h('a', { href: ex.source }, 'Deployment source'));
+    add(h('span', { class: 'tag' }, 'Recorded'));
+    if (ex.pullRequest) add(h('a', { href: ex.pullRequest }, 'PR #' + ex.pullRequest.split('/').pop()));
+    if (ex.run) add(h('a', { href: ex.run }, 'Check run'));
+    if (ex.original) add(h('a', { href: ex.original.replace('..', '') }, 'Original'));
+    if (ex.source) add(h('a', { href: ex.source }, 'Source'));
   } else if (entry.source.kind === 'file') {
-    parts.push(h('span', { class: 'tag' }, 'Opened file'), entry.source.file);
+    add(h('span', { class: 'tag' }, 'File'), h('span', {}, entry.source.file));
   } else {
-    parts.push(h('span', { class: 'tag live' }, 'Live'), 'Run ' + new Date(r.generatedAt ?? Date.now()).toLocaleString());
+    add(h('span', { class: 'tag live' }, 'Live'), h('span', {}, new Date(r.generatedAt ?? Date.now()).toLocaleTimeString()));
   }
-  if (r.block) parts.push('X Layer block ' + fmtBlock(r.block));
-  const line = h('p', { class: 'source' });
-  parts.forEach((part, i) => { if (i > 1) line.append(h('span', { class: 'sep', 'aria-hidden': 'true' }, ' · ')); line.append(part); });
-  const extra = entry.source.kind === 'example' ? h('p', { class: 'summary' }, entry.source.example.summary) : null;
-  return h('div', {}, line, extra);
+  if (r.block) add(h('span', {}, 'Block ' + fmtBlock(r.block)));
+  return line;
 }
 
-function fact(label, value, cls) {
-  return h('div', {}, h('dt', {}, label), h('dd', { class: cls || null }, value == null ? '—' : String(value)));
-}
-
-function statusLine(label, value, details) {
-  return h('p', {}, h('span', { class: 'k' }, label), h('strong', {}, value), ...details.filter(Boolean).map(detail => [h('span', { class: 'sep', 'aria-hidden': 'true' }, ' · '), detail]));
+function pill(label, value, details, tone) {
+  return h('p', { class: 'pill ' + (tone || '') }, h('span', { class: 'k' }, label), h('strong', {}, value),
+    ...details.filter(Boolean).map(detail => h('span', { class: 'd' }, detail)));
 }
 
 function compareStatus(r) {
-  const s = r.comparison?.status;
-  return { equivalent: 'Equivalent', different: 'Different', 'interface-mismatch': 'Interface differs', incomplete: 'Incomplete' }[s] ?? 'Not completed';
+  return { equivalent: 'Equivalent', different: 'Different', 'interface-mismatch': 'Interface differs', incomplete: 'Incomplete' }[r.comparison?.status] ?? 'Not completed';
 }
 
 function replayDetail(r) {
   const replay = r.replay ?? {};
-  if (replay.status === 'confirmed') return replay.kind === 'counterexample' ? 'both processors returned these outputs via eval' : replay.inputs + ' spot-check inputs agree with PinCheck';
-  if (replay.status === 'disagrees') return 'a processor returned a different output than PinCheck';
+  if (replay.status === 'confirmed') return replay.kind === 'counterexample' ? 'both processors agree' : replay.inputs + ' spot-checks agree';
+  if (replay.status === 'disagrees') return 'a processor disagrees with PinCheck';
   if (replay.status === 'unavailable') return replay.reason;
-  if (r.comparison?.method === 'identical-netlist' && r.interface?.baseline?.nState) return 'stateful circuits are not replayed with eval';
   return null;
+}
+
+// Counterexample as rows of bits, least significant first. Changed outputs are lit.
+function ledBlock(r, labels = {}) {
+  const m = r.comparison.firstMismatch;
+  const { nIn, nOut } = r.interface?.baseline ?? {};
+  if (!Number.isInteger(nIn) || !Number.isInteger(nOut)) return null;
+  const inputs = bitRows(m.packedInput, nIn, labels.inputs);
+  const before = bitRows(m.baselineOutput, nOut, labels.outputs);
+  const after = bitRows(m.candidateOutput, nOut, labels.outputs);
+  const row = (name, hex, bits, reference, referenceHex) => h('div', { class: 'led-row' },
+    h('span', { class: 'led-name' }, name),
+    h('span', { class: 'leds', role: 'img', 'aria-label': name + ' ' + hex + ', bits from bit 0: ' + bits.map(b => b.value).join('') },
+      bits.slice(0, MAX_LEDS).map((b, i) => h('i', {
+        class: [b.value ? 'on' : '', reference && reference[i].value !== b.value ? 'changed' : ''].join(' ').trim() || null,
+        title: (b.name ? b.name + ', bit ' : 'bit ') + b.index + ' = ' + b.value,
+      })),
+      bits.length > MAX_LEDS ? h('em', {}, '+' + (bits.length - MAX_LEDS)) : null),
+    h('code', { class: 'led-hex' + (referenceHex && referenceHex !== hex ? ' changed' : '') }, hex));
+  return h('div', { class: 'led-block' },
+    row('Input', m.packedInput, inputs),
+    row('#' + r.baseline.id, m.baselineOutput, before),
+    row('#' + r.candidate.id, m.candidateOutput, after, before, m.baselineOutput));
+}
+
+function interfaceBlock(r) {
+  const { baseline: b, candidate: n } = r.interface ?? {};
+  const cell = (label, x, y) => h('div', {}, h('span', {}, label), h('b', {}, String(x)), h('span', { 'aria-hidden': 'true' }, '→'), h('b', { class: x !== y ? 'changed' : null }, String(y)));
+  return h('div', { class: 'iface' }, cell('Input bits', b?.nIn, n?.nIn), cell('Output bits', b?.nOut, n?.nOut));
+}
+
+let tabsId = 0;
+function detailTabs(r, labels) {
+  const panels = [
+    ['Evidence', () => evidenceList(r)],
+    r.comparison?.firstMismatch && r.interface?.baseline ? ['Bits', () => bitsTable(r, labels)] : null,
+    ['JSON', () => h('pre', { class: 'json', tabindex: '0' }, h('code', {}, JSON.stringify(r, null, 2)))],
+  ].filter(Boolean);
+  const id = 'rt' + (++tabsId);
+  const list = h('div', { class: 'rtabs', role: 'tablist', 'aria-label': 'Report details' });
+  const body = h('div', { class: 'rpanel', role: 'tabpanel', id: id + '-panel', tabindex: '0' });
+  const buttons = panels.map(([label], i) => h('button', {
+    role: 'tab', type: 'button', id: id + '-' + i, 'aria-controls': id + '-panel', 'aria-selected': 'false', tabindex: '-1',
+    onclick: () => show(i),
+    onkeydown: event => {
+      const move = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+      if (move === undefined) return;
+      event.preventDefault();
+      const next = (i + move + panels.length) % panels.length;
+      show(next);
+      buttons[next].focus();
+    },
+  }, label));
+  const show = i => {
+    buttons.forEach((button, j) => { button.setAttribute('aria-selected', String(i === j)); button.tabIndex = i === j ? 0 : -1; });
+    body.setAttribute('aria-labelledby', id + '-' + i);
+    body.replaceChildren(panels[i][1]());
+  };
+  list.append(...buttons);
+  show(0);
+  return h('div', { class: 'details' }, list, body);
 }
 
 function bitsTable(r, labels = {}) {
   const m = r.comparison.firstMismatch;
-  const { nIn, nOut } = r.interface?.baseline ?? {};
-  if (!Number.isInteger(nIn) || !Number.isInteger(nOut)) return '';
+  const { nIn, nOut } = r.interface.baseline;
   const inputs = bitRows(m.packedInput, nIn, labels.inputs);
-  const oldOut = bitRows(m.baselineOutput, nOut, labels.outputs);
-  const newOut = bitRows(m.candidateOutput, nOut, labels.outputs);
-  const named = (labels.inputs?.length || labels.outputs?.length);
-  return h('details', { class: 'bits' },
-    h('summary', {}, 'Bits of the first mismatch (' + nIn + ' in, ' + nOut + ' out, least significant bit first)'),
-    h('div', { class: 'bit-tables' },
-      h('div', { class: 'table' }, h('table', {},
-        h('caption', {}, 'Input ' + m.packedInput),
-        h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Bit'), named ? h('th', { scope: 'col' }, 'Name') : null, h('th', { scope: 'col' }, 'Value'))),
-        h('tbody', {}, inputs.map(b => h('tr', {}, h('td', {}, b.index), named ? h('td', {}, b.name ?? '') : null, h('td', {}, b.value)))))),
-      h('div', { class: 'table' }, h('table', {},
-        h('caption', {}, 'Outputs'),
-        h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Bit'), named ? h('th', { scope: 'col' }, 'Name') : null, h('th', { scope: 'col' }, 'Current'), h('th', { scope: 'col' }, 'Candidate'))),
-        h('tbody', {}, oldOut.map((b, i) => {
-          const changed = b.value !== newOut[i].value;
-          return h('tr', { class: changed ? 'changed' : null }, h('td', {}, b.index), named ? h('td', {}, b.name ?? '') : null, h('td', {}, b.value),
-            h('td', {}, newOut[i].value, changed ? h('span', { class: 'visually-hidden' }, ' (changed)') : null));
-        })))),
-    ));
+  const before = bitRows(m.baselineOutput, nOut, labels.outputs);
+  const after = bitRows(m.candidateOutput, nOut, labels.outputs);
+  const named = labels.inputs?.length || labels.outputs?.length;
+  return h('div', { class: 'bit-tables' },
+    h('div', { class: 'table' }, h('table', {},
+      h('caption', {}, 'Input ' + m.packedInput),
+      h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Bit'), named ? h('th', { scope: 'col' }, 'Name') : null, h('th', { scope: 'col' }, 'Value'))),
+      h('tbody', {}, inputs.map(b => h('tr', {}, h('td', {}, b.index), named ? h('td', {}, b.name ?? '') : null, h('td', {}, b.value)))))),
+    h('div', { class: 'table' }, h('table', {},
+      h('caption', {}, 'Outputs'),
+      h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Bit'), named ? h('th', { scope: 'col' }, 'Name') : null, h('th', { scope: 'col' }, '#' + r.baseline.id), h('th', { scope: 'col' }, '#' + r.candidate.id))),
+      h('tbody', {}, before.map((b, i) => {
+        const changed = b.value !== after[i].value;
+        return h('tr', { class: changed ? 'changed' : null }, h('td', {}, b.index), named ? h('td', {}, b.name ?? '') : null, h('td', {}, b.value),
+          h('td', {}, after[i].value, changed ? h('span', { class: 'visually-hidden' }, ' (changed)') : null));
+      })))));
 }
 
 function evidenceList(r) {
   const rows = [];
   const add = (k, ...v) => rows.push(h('dt', {}, k), h('dd', {}, ...v));
+  add('Scope', guaranteeFor(r));
   if (r.chain) add('Chain', (r.chain.name ?? 'X Layer') + ' (' + r.chain.id + ')');
   if (r.block) {
     add('Block', fmtBlock(r.block), ' ', mono(r.block.hash));
     if (r.block.timestamp) add('Block time', new Date(Number(BigInt(r.block.timestamp)) * 1000).toISOString());
   }
-  if (r.pinning) add('Pinning', r.pinning.method === 'eip-1898-block-hash' ? 'EIP-1898 block-hash calls with requireCanonical' : 'Block number; ' + (r.pinning.note ?? 'hash rechecked after the run'));
-  for (const [address, info] of Object.entries(r.processors ?? {})) add('Processor', mono(address), info.registered ? ' registered with the X Layer TapeOut factory' : ' not registered');
-  if (r.factory) add('Factory', mono(r.factory.address), r.factory.sealed ? ' sealed' : ' not sealed: the implementation can change after this block');
-  if (r.implementation) add('Implementation', mono(r.implementation.address), ' via beacon ', mono(r.implementation.beacon));
+  if (r.pinning) add('Pinning', r.pinning.method === 'eip-1898-block-hash' ? 'EIP-1898 block hash, requireCanonical' : 'Block number; ' + (r.pinning.note ?? 'hash rechecked after the run'));
+  for (const [address, info] of Object.entries(r.processors ?? {})) add('Processor', mono(address), info.registered ? ' registered with the factory' : ' not registered');
+  if (r.factory) add('Factory', mono(r.factory.address), r.factory.sealed ? ' sealed' : ' not sealed');
+  if (r.implementation) add('Implementation', mono(r.implementation.address));
   if (r.comparison?.method) add('Method', METHODS[r.comparison.method] + (r.comparison.seed ? ', seed ' + r.comparison.seed : ''));
   for (const [key, dep] of Object.entries(r.dependencies ?? {})) {
-    add('Netlist', mono(key), h('br'), dep.nIn + ' in, ' + dep.nOut + ' out, ' + (dep.nState ? dep.nState + ' state bits, ' : '') + (dep.gateCount ?? '?') + ' gates' + (dep.bytes ? ', ' + dep.bytes + ' bytes' : ''),
+    add('Netlist', mono(key), h('br'), dep.nIn + ' in, ' + dep.nOut + ' out, ' + (dep.nState ? dep.nState + ' state bits, ' : '') + (dep.gateCount ?? '?') + ' gates',
       dep.keccak256 ? [h('br'), 'keccak256 ', mono(dep.keccak256)] : '', h('br'), 'sha256 ', mono(dep.sha256));
   }
-  add('Evaluator', 'PinCheck ' + (r.tool?.version ?? '?') + ', report schema ' + r.schema);
-  if (r.rpc) add('RPC', r.rpc.endpoint);
+  add('Evaluator', 'PinCheck ' + (r.tool?.version ?? '?') + ', schema ' + r.schema);
   if (r.generatedAt) add('Generated', r.generatedAt);
-  return h('details', { class: 'evidence' }, h('summary', {}, 'Evidence: block, fingerprints, processors, evaluator'), h('dl', {}, rows));
+  return h('dl', { class: 'evidence' }, rows);
 }
 
 // ---------- actions ----------
@@ -176,14 +218,14 @@ function evidenceList(r) {
 function setBusy(on, label) {
   busy = on;
   reportEl.setAttribute('aria-busy', String(on));
+  reportEl.classList.toggle('loading', on);
   for (const button of document.querySelectorAll('.workbench button')) button.disabled = on;
   if (on) {
     const started = Date.now();
-    const timer = h('span', {}, '');
-    const status = h('div', { class: 'loading', role: 'status' }, h('span', { class: 'spinner', 'aria-hidden': 'true' }), h('span', {}, label + ' '), timer);
+    const timer = h('span', { class: 'elapsed' }, '');
     notice.hidden = false;
     notice.className = 'notice';
-    notice.replaceChildren(status);
+    notice.replaceChildren(h('div', { class: 'loading-line', role: 'status' }, h('span', { class: 'spinner', 'aria-hidden': 'true' }), h('span', {}, label), timer));
     const tick = setInterval(() => { if (!busy) return clearInterval(tick); timer.textContent = Math.round((Date.now() - started) / 1000) + 's'; }, 1000);
   } else {
     notice.hidden = true;
@@ -195,7 +237,7 @@ async function runLive({ baseline, candidate, block }) {
   if (busy) return;
   const params = new URLSearchParams({ baseline: baseline.trim(), candidate: candidate.trim() });
   if (block && block.trim() && block.trim() !== 'latest') params.set('block', block.trim());
-  setBusy(true, params.has('block') ? 'Reading both circuits from X Layer at the pinned block…' : 'Reading both circuits from the latest X Layer block…');
+  setBusy(true, params.has('block') ? 'Reading X Layer at the pinned block' : 'Reading X Layer');
   let report, failure;
   try {
     const response = await fetch('/api/compare?' + params);
@@ -204,14 +246,14 @@ async function runLive({ baseline, candidate, block }) {
     else if (!response.ok) failure = { code: body.code ?? 'error', reason: body.reason ?? 'The server returned HTTP ' + response.status };
     else report = body;
   } catch {
-    failure = { code: 'network', reason: 'Could not reach the PinCheck server. Check your connection and try again.' };
+    failure = { code: 'network', reason: 'Could not reach the PinCheck server.' };
   }
   setBusy(false);
   if (report && !(report.status === 'inconclusive' && TRANSIENT.has(report.code) && current)) {
     history.replaceState(null, '', '/?' + new URLSearchParams({ baseline: refText(report.baseline), candidate: refText(report.candidate), ...(report.block ? { block: report.block.hash } : {}) }) + '#compare');
     selectExampleButton(null);
     render({ report, source: { kind: 'live' } });
-    document.getElementById('decision')?.focus();
+    document.getElementById('decision')?.focus({ preventScroll: true });
     return;
   }
   // A failed rerun never replaces evidence already on screen.
@@ -219,8 +261,8 @@ async function runLive({ baseline, candidate, block }) {
   const steps = report ? nextSteps(report) : [failure.code === 'busy' ? 'Wait a few seconds and run it again.' : 'Try again.'];
   notice.hidden = false;
   notice.className = 'notice warn';
-  notice.replaceChildren(h('p', {}, h('strong', {}, 'The live run did not complete. '), reason.replace(/\.?$/, '.'), current ? ' The report below is unchanged.' : ''), h('p', {}, steps.join(' ')));
-  notice.focus?.();
+  notice.replaceChildren(h('p', {}, h('strong', {}, 'Live run did not complete. '), reason.replace(/\.?$/, '.'), current ? ' The report below is unchanged.' : ''), h('p', {}, steps.join(' ')));
+  notice.focus();
   if (!current) render({ report: report ?? { schema: 2, status: 'inconclusive', code: failure.code, reason, replay: { status: 'not-run' } }, source: { kind: 'live' } });
 }
 
@@ -266,7 +308,7 @@ function selectExampleButton(id) {
   for (const button of $('examples').querySelectorAll('button')) button.setAttribute('aria-pressed', String(button.dataset.id === id));
 }
 
-async function showExample(id, { focus = false, updateUrl = true } = {}) {
+async function showExample(id, { focus = false } = {}) {
   const example = examples.find(e => e.id === id) ?? examples[0];
   if (!example) return;
   selectExampleButton(example.id);
@@ -274,17 +316,17 @@ async function showExample(id, { focus = false, updateUrl = true } = {}) {
   const response = await fetch('/examples/' + example.report);
   const report = normalize(await response.json());
   render({ report, source: { kind: 'example', example } });
-  if (updateUrl) history.replaceState(null, '', '/?example=' + example.id + (location.hash || ''));
-  if (focus) document.getElementById('decision')?.focus();
+  if (focus) document.getElementById('decision')?.focus({ preventScroll: true });
 }
 
+const SHORT = { 'orderguard-1-to-11': 'Rejected #1 → #11', 'orderguard-1-to-2': 'Accepted #1 → #2', 'neon-reliquary-5-vs-7': '20-bit circuit' };
 async function loadExamples() {
   const index = await (await fetch('/examples/index.json')).json();
   examples = index.examples;
   $('examples').replaceChildren(...examples.map(example => h('button', {
-    type: 'button', class: 'chip', 'data-id': example.id, 'aria-pressed': 'false',
-    onclick: () => showExample(example.id, { focus: true }),
-  }, example.title)));
+    type: 'button', class: 'chip', 'data-id': example.id, 'aria-pressed': 'false', title: example.title,
+    onclick: () => { showExample(example.id, { focus: true }); history.replaceState(null, '', '/?example=' + example.id + '#compare'); },
+  }, SHORT[example.id] ?? example.title)));
 }
 
 // ---------- form ----------
@@ -292,9 +334,9 @@ async function loadExamples() {
 function validate() {
   let first = null;
   for (const [name, pattern, message] of [
-    ['baseline', REF, 'Enter a processor address, a colon, and a circuit ID, such as 0x57F319CF056F72F48cF1dbb670F2A3DB007Aa355:1.'],
-    ['candidate', REF, 'Enter a processor address, a colon, and a circuit ID.'],
-    ['block', BLOCK, 'Use latest, a block number, or a 32-byte block hash.'],
+    ['baseline', REF, 'Current circuit: use processor-address:circuit-id, for example 0x57F319CF056F72F48cF1dbb670F2A3DB007Aa355:1.'],
+    ['candidate', REF, 'Candidate circuit: use processor-address:circuit-id.'],
+    ['block', BLOCK, 'Block: use latest, a block number, or a 32-byte block hash.'],
   ]) {
     const input = form.elements[name];
     const error = $(name + '-error');
@@ -304,10 +346,7 @@ function validate() {
     error.textContent = ok ? '' : message;
     if (!ok && !first) first = input;
   }
-  if (first) {
-    if (first.name === 'block') first.closest('details').open = true;
-    first.focus();
-  }
+  first?.focus();
   return !first;
 }
 
@@ -334,8 +373,9 @@ $('open-report').addEventListener('change', async event => {
       labels = dep.labels;
     }
     selectExampleButton(null);
+    notice.hidden = true;
     render({ report: normalize(report), source: { kind: 'file', file: file.name }, labels });
-    document.getElementById('decision')?.focus();
+    document.getElementById('decision')?.focus({ preventScroll: true });
   } catch (error) {
     notice.hidden = false;
     notice.className = 'notice warn';
@@ -344,10 +384,6 @@ $('open-report').addEventListener('change', async event => {
     event.target.value = '';
   }
 });
-
-for (const link of document.querySelectorAll('[data-focus-form]')) {
-  link.addEventListener('click', () => setTimeout(() => form.elements.baseline.focus({ preventScroll: false }), 0));
-}
 
 // ---------- start ----------
 
@@ -358,12 +394,13 @@ try {
     form.elements.baseline.value = params.get('baseline');
     form.elements.candidate.value = params.get('candidate');
     if (params.get('block')) form.elements.block.value = params.get('block');
-    await showExample(params.get('example'), { updateUrl: false });
+    await showExample(params.get('example'));
     if (validate()) runLive({ baseline: params.get('baseline'), candidate: params.get('candidate'), block: params.get('block') ?? '' });
   } else {
     await showExample(params.get('example'));
+    if (params.has('example') && location.hash === '#compare') $('compare').scrollIntoView();
   }
 } catch {
   reportEl.setAttribute('aria-busy', 'false');
-  reportEl.replaceChildren(h('p', { class: 'empty' }, 'The recorded examples could not be loaded. You can still compare circuits with the form.'));
+  reportEl.replaceChildren(h('p', { class: 'empty' }, 'The recorded examples could not be loaded. You can still compare circuits.'));
 }

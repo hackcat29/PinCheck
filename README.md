@@ -81,7 +81,7 @@ node cli.mjs 0x57F319CF056F72F48cF1dbb670F2A3DB007Aa355:1 0x57F319CF056F72F48cF1
 
 The CLI prints a JSON report and exits `0` (compatible), `1` (behavior or interface changed) or `2` (inconclusive or invalid input). `node cli.mjs gate --base A.json --head B.json` runs the same gate as the action. Set `X_LAYER_RPC` for another endpoint; credentials in it never appear in output.
 
-The workbench opens on recorded evidence, reruns it live, compares any two circuits, and opens saved reports (including the `pincheck-report` artifact from a GitHub run) in the browser without an RPC. Deployment, environment variables, health checks and the RPC outage runbook are in [docs/deploy.md](docs/deploy.md).
+The site opens on the two real netlists from pull request #1, rendered in 3D with three.js on WebGPU (WebGL 2 where WebGPU is unavailable); flip the input bits to see where the circuits disagree. Further down, the browser evaluates all 1,048,576 inputs of a 20-input circuit pair with a TypeGPU compute shader (or the CPU) and checks the count against the recorded report. The workbench opens on recorded evidence, reruns it live, compares any two circuits, and opens saved reports (including the `pincheck-report` artifact from a GitHub run) in the browser without an RPC. Agents can start from [`/llms.txt`](web/llms.txt). Deployment, environment variables, health checks and the RPC outage runbook are in [docs/deploy.md](docs/deploy.md).
 
 ## Layout
 
@@ -92,8 +92,11 @@ The workbench opens on recorded evidence, reruns it live, compares any two circu
 | `src/manifest.mjs`, `src/gate.mjs`, `src/summary.mjs` | `pincheck.json`, the release gate, the GitHub job summary |
 | `src/report.mjs` | Decision, coverage, guarantee and next-step wording shared by the CLI, summary and browser |
 | `action.yml`, `action/` | The composite GitHub Action |
-| `server.mjs`, `web/` | Workbench and docs site |
-| `examples/` | Recorded schema 2 reports with provenance, and the consumer repository layout |
+| `server.mjs`, `web/` | Site, workbench and docs |
+| `web/landing/` | Landing page modules: the 3D netlist scene (three.js), the input-space map (TypeGPU), and the shared netlist evaluator they use |
+| `web/vendor/` | three.js 0.187, TypeGPU 0.12 and the Geist fonts, bundled and served by PinCheck itself. Rebuild with `npm run vendor`; hashes and licenses are recorded next to them |
+| `scripts/` | `vendor.mjs` rebuilds `web/vendor`; `record-netlists.mjs` rereads the example netlists from X Layer and checks them against the recorded fingerprints |
+| `examples/` | Recorded schema 2 reports with provenance, their netlists, and the consumer repository layout |
 | `demo/` | The schema 1 reports captured by the original GitHub checks, and the manifest PRs #1 and #2 change |
 
 ## Verification evidence
@@ -102,7 +105,7 @@ Every check below was run on 2026-11-17 for v0.2.0 and passed, or returned the r
 
 ### Deterministic tests (`npm test`, no network)
 
-55 of 55 pass, locally and in GitHub Actions.
+60 of 60 pass locally; the 55 that existed at v0.2.0 also pass in GitHub Actions.
 
 | File | Tests | Covers |
 |---|---|---|
@@ -111,6 +114,7 @@ Every check below was run on 2026-11-17 for v0.2.0 and passed, or returned the r
 | `test/gate.test.mjs` | 13 | Manifest validation, legacy manifests, pass/fail/inconclusive exit codes, acceptChange bound to one transition and refused for failed runs, added/removed/multiple dependencies, summary content with bit names, CLI exit codes |
 | `test/web.test.mjs` | 4 | Landing-page evidence matches the recorded report, recorded examples match the captured v0.1 fingerprints, Markdown escaping, server validation, 429 under load and cache hits |
 | `test/docs.test.mjs` | 4 | Install snippets, README, example layout and ruleset stay in sync |
+| `test/site.test.mjs` | 5 | Recorded netlists match report fingerprints, the browser evaluator reproduces every recorded mismatch count, GPU program layout, vendored file hashes, static routes and path rejection |
 
 ### GitHub Actions
 
@@ -186,6 +190,15 @@ Checked with Playwright (Chromium) and axe-core 4.10 at 1280 px and 390 px, in l
 - **Server:** every route returned the expected status and content type. Bad input got 400, an unknown path 404, and a POST 405, and the CSP header is set. The deep health check confirmed chain 196.
 - **RPC outage:** with an unreachable RPC URL containing a key, the deep health check returned 503, comparisons returned Inconclusive, and the key appeared in neither the response nor the server log.
 - **Production launch:** `NODE_ENV=production HOST=0.0.0.0 PORT=8080 node server.mjs` served the site and docs.
+
+### Site rendering and GPU compute
+
+Checked on 2026-11-17 with Playwright in headless Chrome (WebGPU on Apple Metal) and in headless Chromium without a WebGPU adapter:
+
+- **Hero:** the hero renders the real OrderGuard #1 and #11 netlists with three.js on WebGPU, and on WebGL 2 when no adapter exists. Flipping input `x1` with the mouse or the keyboard changes the input to `0x03` or `0x02`, and both outputs update from the real netlists.
+- **Input map:** TypeGPU evaluates all 1,048,576 inputs of Neon Reliquary #5 vs #7 on the GPU in 57 to 151 ms and finds 131,072 differing inputs, the count in the recorded report. Without WebGPU, the CPU path computes the same 131,072 in about 10 ms. Hovering or pressing N shows real outputs for any input, for example `0xb0a501`: #5 `0x4f1201`, #7 `0x4f1202`.
+- **Accessibility and layout:** no axe-core violations on the landing page or docs at 1440 px and 390 px. Neither width has horizontal scrolling or a touch target under 24 px. With reduced motion, all content is visible.
+- **Tests:** the netlists, the browser evaluator's counts, the GPU program layout, vendored file hashes and the new static routes are covered by `test/site.test.mjs`.
 
 ### Evaluator speed
 

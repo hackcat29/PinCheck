@@ -5,21 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Docs: add PinCheck to your repository</title>
   <meta name="description" content="Install the PinCheck GitHub check, pin your TapeOut circuits, and read PinCheck reports.">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#09090b">
+  <link rel="preload" href="/vendor/geist-sans.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/docs.mjs"></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
-  <header class="site">
-    <div class="wrap bar">
-      <a class="brand" href="/" aria-label="PinCheck home"><span class="mark" aria-hidden="true"></span>PinCheck</a>
+  <header class="nav scrolled">
+    <div class="wrap nav-bar">
+      <a class="brand" href="/" aria-label="PinCheck home"><span class="mark" aria-hidden="true"><i></i></span>PinCheck</a>
       <nav aria-label="Primary">
+        <a href="/#how">How it works</a>
         <a href="/#compare">Compare</a>
         <a href="/docs" aria-current="page">Docs</a>
         <a href="https://github.com/hackcat29/PinCheck">GitHub</a>
       </nav>
+      <a class="button small primary nav-cta" href="#install">Install</a>
     </div>
   </header>
   <div class="docs wrap">
@@ -29,6 +33,11 @@
       <!--DOCS-->
     </main>
   </div>
-  <footer class="site wrap"><p>PinCheck {{VERSION}} · <a href="https://github.com/hackcat29/PinCheck/blob/main/docs/install.md">Edit this page on GitHub</a></p></footer>
+  <footer class="footer">
+    <div class="wrap footer-bar">
+      <span class="brand small"><span class="mark" aria-hidden="true"><i></i></span>PinCheck {{VERSION}}</span>
+      <nav aria-label="Footer"><a href="/">Home</a><a href="https://github.com/hackcat29/PinCheck">GitHub</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/hackcat29/PinCheck/blob/main/docs/install.md">Edit this page</a></nav>
+    </div>
+  </footer>
 </body>
 </html>

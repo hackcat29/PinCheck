@@ -2,124 +2,299 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>PinCheck: catch breaking TapeOut circuit upgrades</title>
-  <meta name="description" content="PinCheck pins the TapeOut circuits your X Layer app calls and fails the pull request when a proposed upgrade changes an output, with the exact input that proves it.">
-  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="PinCheck checks every input of a proposed TapeOut circuit on X Layer and fails the pull request that changes an output, with the input that proves it.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#09090b">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/vendor/geist-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="alternate" type="text/plain" href="/llms.txt" title="PinCheck for agents">
   <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/landing/landing.mjs"></script>
   <script type="module" src="/app.mjs"></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
-  <header class="site">
-    <div class="wrap bar">
-      <a class="brand" href="/" aria-label="PinCheck home"><span class="mark" aria-hidden="true"></span>PinCheck</a>
+  <header class="nav" data-nav>
+    <div class="wrap nav-bar">
+      <a class="brand" href="/" aria-label="PinCheck home"><span class="mark" aria-hidden="true"><i></i></span>PinCheck</a>
       <nav aria-label="Primary">
-        <a href="/#compare">Compare</a>
+        <a href="#how">How it works</a>
+        <a href="#compare">Compare</a>
         <a href="/docs">Docs</a>
         <a href="https://github.com/hackcat29/PinCheck">GitHub</a>
       </nav>
+      <a class="button small primary nav-cta" href="#install">Add to your repo</a>
     </div>
   </header>
 
   <main id="main">
-    <section class="hero wrap" aria-labelledby="hero-title">
-      <div class="hero-title">
-        <p class="eyebrow">For X Layer apps that call TapeOut circuits</p>
-        <h1 id="hero-title">Catch breaking TapeOut circuit upgrades before they ship.</h1>
-      </div>
-      <div class="hero-body">
-        <p class="lede">Pin the circuits your app calls. When a pull request proposes a new one, PinCheck checks every input at one X Layer block, replays the first difference on the deployed processors, and fails the check with the input that proves it.</p>
-        <div class="cta">
-          <a class="button primary" href="/docs#install">Add to your repo</a>
-          <a class="button" href="#compare" data-focus-form>Compare your circuits</a>
+    <!-- Hero: the two real netlists from pull request #1 -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <h1 id="hero-title" class="split">Catch breaking TapeOut circuit upgrades before they ship.</h1>
+          <p class="lede" data-reveal>PinCheck checks every input of a proposed circuit on X Layer and fails the pull request that changes an output.</p>
+          <div class="cta" data-reveal>
+            <a class="button primary" href="#install">Add to your repo</a>
+            <a class="button ghost" href="#compare">Compare circuits</a>
+          </div>
+          <div class="install-pill" data-reveal>
+            <code>uses: hackcat29/PinCheck@v0.2.0</code>
+            <button type="button" class="icon-button" data-copy-text="uses: hackcat29/PinCheck@v0.2.0" aria-label="Copy the action reference"><svg aria-hidden="true" viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="2"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg></button>
+          </div>
         </div>
+        <figure class="stage" data-stage data-differs="true" aria-labelledby="stage-caption">
+          <canvas aria-hidden="true"></canvas>
+          <button type="button" class="pin" data-pin="0" aria-pressed="true" aria-label="Input bit 0"><span>x0</span><b data-v>1</b></button>
+          <button type="button" class="pin" data-pin="1" aria-pressed="false" aria-label="Input bit 1"><span>x1</span><b data-v>0</b></button>
+          <div class="out" data-out="0"><span>#1</span><b data-v>0x01</b></div>
+          <div class="out" data-out="1"><span>#11</span><b data-v>0x00</b></div>
+          <figcaption id="stage-caption" class="stage-bar">
+            <a href="https://github.com/hackcat29/PinCheck/pull/1">PR #1</a>
+            <span>input <b data-input>0x01</b></span>
+            <span class="verdict"><i aria-hidden="true"></i><span class="when-differ">Outputs differ</span><span class="when-match">Outputs match</span></span>
+          </figcaption>
+        </figure>
       </div>
+    </section>
 
-      <figure class="pr-card" aria-labelledby="pr-title">
-        <figcaption class="pr-head">
-          <span class="tag">Real pull request</span>
-          <a id="pr-title" href="https://github.com/hackcat29/PinCheck/pull/1">#1 Replace OrderGuard circuit #1 with #11</a>
-        </figcaption>
-        <dl class="evidence-row">
-          <div><dt>Input</dt><dd>0x01</dd></div>
-          <div><dt>Current #1</dt><dd>0x01</dd></div>
-          <div><dt>Candidate #11</dt><dd class="changed">0x00</dd></div>
-          <div><dt>Replay</dt><dd class="plain">Confirmed by both processors</dd></div>
-        </dl>
-        <p class="check" data-status="behavior-changed">
-          <span class="glyph" aria-hidden="true">✕</span>
-          <span><strong>PinCheck / Circuit compatibility</strong> failed. The required check blocked the merge.</span>
-          <a href="https://github.com/hackcat29/PinCheck/actions/runs/44116618733">Run log</a>
-        </p>
-        <div class="diff" aria-label="Change in demo/circuit.json">
-          <p class="file">demo/circuit.json</p>
-          <pre><code><span class="del">-  "circuit": "0x57F3…a355:1"</span>
+    <!-- Proof: the real check run -->
+    <section class="proof wrap" aria-labelledby="proof-title">
+      <h2 id="proof-title" data-reveal>It already blocked a real upgrade.</h2>
+      <div class="proof-grid">
+        <article class="pr" data-reveal>
+          <header>
+            <span class="pr-state"><svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.8"/><circle cx="4" cy="12.5" r="1.8"/><circle cx="12" cy="12.5" r="1.8"/><path d="M4 5.3v5.4M12 10.7V7a2 2 0 0 0-2-2H7"/></svg>Open</span>
+            <a href="https://github.com/hackcat29/PinCheck/pull/1">Replace OrderGuard circuit #1 with #11 <span class="num">#1</span></a>
+          </header>
+          <pre class="diff"><code><span class="file">demo/circuit.json</span>
+<span class="del">-  "circuit": "0x57F3…a355:1"</span>
 <span class="add">+  "circuit": "0x57F3…a355:11"</span></code></pre>
+          <ul class="checks">
+            <li data-status="pass"><i aria-hidden="true"></i>Evaluator tests</li>
+            <li data-status="fail"><i aria-hidden="true"></i>Circuit compatibility <span class="req">Required</span> <a href="https://github.com/hackcat29/PinCheck/actions/runs/44116618733">Details</a></li>
+          </ul>
+          <p class="merge-blocked"><svg aria-hidden="true" viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>Merging is blocked</p>
+        </article>
+        <div class="terminal" data-reveal data-terminal role="group" aria-label="Circuit compatibility job output">
+          <div class="term-bar"><i></i><i></i><i></i><span>Circuit compatibility</span></div>
+          <ol class="term-lines">
+            <li>Read pincheck.json at base and head</li>
+            <li>Pinned X Layer block 76,160,736 <span class="dim">0x5069ea17…6a99</span></li>
+            <li>order-guard: <span class="dim">#1 → #11</span></li>
+            <li>Checked 4 of 4 inputs, 3 differ</li>
+            <li class="hl">input 0x01 → current 0x01, candidate 0x00</li>
+            <li>eval on both processors: confirmed</li>
+            <li class="err">✕ Behavior changed. Merge blocked.</li>
+          </ol>
         </div>
-        <p class="provenance">4 of 4 inputs checked at X Layer block 76,160,736. <a href="/?example=orderguard-1-to-11#compare">Open the full report</a></p>
-      </figure>
+      </div>
+      <dl class="evidence-row" data-reveal>
+        <div><dt>Input</dt><dd>0x01</dd></div>
+        <div><dt>Current #1</dt><dd>0x01</dd></div>
+        <div><dt>Candidate #11</dt><dd class="changed">0x00</dd></div>
+        <div><dt>Replay</dt><dd class="plain">Confirmed</dd></div>
+      </dl>
+      <p class="visually-hidden">4 of 4 inputs checked at X Layer block 76,160,736.</p>
     </section>
 
-    <section class="how wrap" aria-labelledby="how-title">
-      <h2 id="how-title" class="visually-hidden">How PinCheck works</h2>
-      <ol>
-        <li><h3>Pin</h3><p>List the circuits your app calls in <code>pincheck.json</code>, as processor address and circuit ID.</p></li>
-        <li><h3>Compare</h3><p>Every input of both circuits is evaluated at one block hash: all 2<sup>n</sup> inputs, up to 26 input bits in CI.</p></li>
-        <li><h3>Replay</h3><p>The first difference is sent to both deployed processors with <code>eval</code>. If a processor disagrees with PinCheck, the check fails.</p></li>
-        <li><h3>Gate</h3><p>A required GitHub check blocks the merge. An intended change is approved in the manifest, with a reason.</p></li>
-      </ol>
+    <!-- Facts -->
+    <section class="facts wrap" aria-label="PinCheck in numbers">
+      <dl>
+        <div data-reveal><dt>Inputs checked per run, up to</dt><dd><span data-count="67108864">67,108,864</span></dd></div>
+        <div data-reveal><dt>Block hash pins every read</dt><dd><span data-count="1">1</span></dd></div>
+        <div data-reveal><dt>Processors replay each mismatch</dt><dd><span data-count="2">2</span></dd></div>
+        <div data-reveal><dt>Runtime dependencies</dt><dd><span data-count="0">0</span></dd></div>
+      </dl>
     </section>
 
+    <!-- How it works: sticky story -->
+    <section id="how" class="story wrap" aria-labelledby="how-title">
+      <h2 id="how-title" data-reveal>How it works</h2>
+      <div class="story-grid">
+        <ol class="story-steps">
+          <li data-step="0" class="active"><span class="n">01</span><h3>Pin</h3><p>List the circuits your app calls.</p></li>
+          <li data-step="1"><span class="n">02</span><h3>Compare</h3><p>Evaluate every input of both circuits at one block.</p></li>
+          <li data-step="2"><span class="n">03</span><h3>Replay</h3><p>Send the first difference to both deployed processors.</p></li>
+          <li data-step="3"><span class="n">04</span><h3>Gate</h3><p>Block the merge, or record an intended change.</p></li>
+        </ol>
+        <div class="story-visual" aria-hidden="true">
+          <div class="panel" data-panel="0">
+            <pre class="code"><code><span class="t">{</span>
+  <span class="k">"pincheck"</span>: <span class="n">1</span>,
+  <span class="k">"dependencies"</span>: {
+    <span class="k">"order-guard"</span>: {
+      <span class="k">"circuit"</span>: <span class="s">"0x57F3…a355:1"</span>
+    }
+  }
+<span class="t">}</span></code></pre>
+          </div>
+          <div class="panel" data-panel="1">
+            <table class="truth" data-truth><thead><tr><th>input</th><th>#1</th><th>#11</th></tr></thead><tbody></tbody></table>
+          </div>
+          <div class="panel" data-panel="2">
+            <div class="replay">
+              <div class="chip-card"><span>OrderGuard #1</span><code>eval(0x01)</code><b>0x01</b></div>
+              <div class="chip-card bad"><span>OrderGuard #11</span><code>eval(0x01)</code><b>0x00</b></div>
+              <p class="confirm"><i></i>Confirmed at block 76,160,736</p>
+            </div>
+          </div>
+          <div class="panel" data-panel="3">
+            <ul class="checks big">
+              <li data-status="pass"><i></i>Evaluator tests</li>
+              <li data-status="fail"><i></i>Circuit compatibility <span class="req">Required</span></li>
+            </ul>
+            <span class="merge">Merging is blocked</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- The whole input space, computed in the browser -->
+    <section class="space wrap" data-space aria-labelledby="space-title">
+      <div class="space-head">
+        <h2 id="space-title" data-reveal>Every input. Not a sample.</h2>
+        <p class="tag" data-reveal>Neon Reliquary #5 vs #7 · 20 input bits</p>
+      </div>
+      <div class="space-grid">
+        <div class="map" data-reveal>
+          <canvas tabindex="0" role="img" aria-label="Map of all 1,048,576 inputs of Neon Reliquary circuits 5 and 7. Lit cells are inputs where the outputs differ. Use arrow keys to inspect an input and N to jump to the next difference."></canvas>
+          <div class="probe" data-probe hidden>
+            <span>in <b data-k="input"></b></span><span>#5 <b data-k="a"></b></span><span>#7 <b data-k="b"></b></span>
+          </div>
+        </div>
+        <dl class="space-stats" data-reveal>
+          <div><dt>Checked</dt><dd data-stat="checked">0</dd></div>
+          <div><dt>Differ</dt><dd data-stat="differ" class="bad">0</dd></div>
+          <div><dt>Engine</dt><dd data-stat="engine">…</dd></div>
+          <div><dt>Compute</dt><dd data-stat="time">…</dd></div>
+          <div><dt>Report</dt><dd data-stat="verified">…</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <!-- Workbench -->
     <section id="compare" class="workbench wrap" aria-labelledby="compare-title">
       <div class="section-head">
-        <h2 id="compare-title">Compare</h2>
-        <p>Start from recorded evidence, rerun it live on X Layer, or check your own circuits.</p>
+        <h2 id="compare-title" data-reveal>Compare</h2>
+        <div class="examples" role="group" aria-label="Recorded examples" id="examples"></div>
       </div>
-      <div class="examples" role="group" aria-label="Recorded examples" id="examples"></div>
-      <div class="bench">
-        <div class="report-column">
-          <div id="notice" class="notice" tabindex="-1" hidden></div>
-          <article id="report" class="report" aria-live="polite" aria-busy="true">
-            <p class="empty">Loading the recorded example…</p>
-          </article>
+      <form id="compare-form" class="command" novalidate aria-label="Compare two circuits">
+        <div class="field">
+          <label for="baseline">Current</label>
+          <input id="baseline" name="baseline" autocomplete="off" spellcheck="false" placeholder="0x…:1" aria-describedby="baseline-error" required>
         </div>
-        <form id="compare-form" class="panel" novalidate aria-labelledby="form-title">
-          <h3 id="form-title">Compare your circuits</h3>
-          <div class="field">
-            <label for="baseline">Current circuit</label>
-            <input id="baseline" name="baseline" autocomplete="off" spellcheck="false" inputmode="text" placeholder="0x57F3…a355:1" aria-describedby="baseline-help baseline-error" required>
-            <p class="help" id="baseline-help">The circuit your app calls today: processor address, a colon, circuit ID.</p>
-            <p class="error" id="baseline-error" hidden></p>
-          </div>
-          <div class="field">
-            <label for="candidate">Candidate circuit</label>
-            <input id="candidate" name="candidate" autocomplete="off" spellcheck="false" placeholder="0x57F3…a355:11" aria-describedby="candidate-help candidate-error" required>
-            <p class="help" id="candidate-help">The circuit you want to switch to.</p>
-            <p class="error" id="candidate-error" hidden></p>
-          </div>
-          <details class="field">
-            <summary>Block (optional)</summary>
-            <label for="block" class="visually-hidden">Block</label>
-            <input id="block" name="block" autocomplete="off" spellcheck="false" placeholder="latest" aria-describedby="block-help block-error">
-            <p class="help" id="block-help">A block number or hash. Older blocks need an RPC that keeps historical state.</p>
-            <p class="error" id="block-error" hidden></p>
-          </details>
-          <button type="submit" class="button primary">Compare on X Layer</button>
-          <p class="help">Reads X Layer mainnet without a wallet. The web check covers up to 24 input bits; the CLI and GitHub Action cover 26.</p>
-          <div class="open-file">
-            <label for="open-report">Open a saved report</label>
-            <input id="open-report" type="file" accept="application/json,.json" aria-describedby="open-help">
-            <p class="help" id="open-help">JSON from the CLI, this page, or a GitHub run artifact. It is read in your browser and not uploaded.</p>
-          </div>
-        </form>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="field">
+          <label for="candidate">Candidate</label>
+          <input id="candidate" name="candidate" autocomplete="off" spellcheck="false" placeholder="0x…:2" aria-describedby="candidate-error" required>
+        </div>
+        <div class="field block-field">
+          <label for="block">Block</label>
+          <input id="block" name="block" autocomplete="off" spellcheck="false" placeholder="latest" aria-describedby="block-error">
+        </div>
+        <button type="submit" class="button primary">Compare</button>
+        <p class="error" id="baseline-error" hidden></p>
+        <p class="error" id="candidate-error" hidden></p>
+        <p class="error" id="block-error" hidden></p>
+      </form>
+      <div id="notice" class="notice" tabindex="-1" hidden></div>
+      <div class="dropzone" data-dropzone>
+        <article id="report" class="report" aria-live="polite" aria-busy="true"><p class="empty">Loading…</p></article>
+        <label class="open-file">
+          <input id="open-report" type="file" accept="application/json,.json">
+          <span>Open a saved report</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Install -->
+    <section id="install" class="install wrap" aria-labelledby="install-title">
+      <h2 id="install-title" data-reveal>Add it in three files.</h2>
+      <div class="install-grid" data-reveal>
+        <div class="tabs" role="tablist" aria-label="Files to add">
+          <button role="tab" id="tab-0" aria-controls="file-0" aria-selected="true">pincheck.json</button>
+          <button role="tab" id="tab-1" aria-controls="file-1" aria-selected="false" tabindex="-1">.github/workflows/pincheck.yml</button>
+          <button role="tab" id="tab-2" aria-controls="file-2" aria-selected="false" tabindex="-1">.github/CODEOWNERS</button>
+        </div>
+        <div class="files">
+<div role="tabpanel" id="file-0" aria-labelledby="tab-0" class="file-panel"><pre tabindex="0"><code>{
+  "pincheck": 1,
+  "dependencies": {
+    "order-guard": {
+      "circuit": "0x57F319CF056F72F48cF1dbb670F2A3DB007Aa355:1"
+    }
+  }
+}</code></pre><button type="button" class="button small" data-copy-from="file-0">Copy</button></div>
+<div role="tabpanel" id="file-1" aria-labelledby="tab-1" class="file-panel" hidden><pre tabindex="0"><code>name: PinCheck
+on:
+  pull_request:
+  merge_group:
+permissions:
+  contents: read
+jobs:
+  pincheck:
+    name: Circuit compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: hackcat29/PinCheck@v0.2.0
+        with:
+          manifest: pincheck.json</code></pre><button type="button" class="button small" data-copy-from="file-1">Copy</button></div>
+<div role="tabpanel" id="file-2" aria-labelledby="tab-2" class="file-panel" hidden><pre tabindex="0"><code>/pincheck.json        @your-org/circuit-owners
+/.github/workflows/   @your-org/circuit-owners
+/.github/CODEOWNERS   @your-org/circuit-owners</code></pre><button type="button" class="button small" data-copy-from="file-2">Copy</button></div>
+        </div>
+        <ol class="install-steps">
+          <li><span><b>Pin</b> the circuits your app calls.</span></li>
+          <li><span><b>Run</b> the check on every pull request.</span></li>
+          <li><span><b>Own</b> the pin and the workflow with CODEOWNERS.</span></li>
+          <li><span><b>Require</b> <code>Circuit compatibility</code> in a branch ruleset. <a href="/docs#4-require-the-check-before-merge">How</a></span></li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Guarantee -->
+    <section class="scope wrap" aria-labelledby="scope-title">
+      <h2 id="scope-title" data-reveal>What a pass means</h2>
+      <div class="scope-grid">
+        <ul class="yes" data-reveal aria-label="A pass proves">
+          <li>Same output bits for every input</li>
+          <li>Read at one pinned block hash</li>
+          <li>Under TAP-02 evaluation semantics</li>
+          <li>Confirmed against the deployed processors</li>
+        </ul>
+        <ul class="no" data-reveal aria-label="A pass does not prove">
+          <li>That either circuit is correct</li>
+          <li>What the bits mean to your app</li>
+          <li>Behavior after an implementation upgrade</li>
+          <li>Stateful circuits that are not identical</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="final wrap" aria-labelledby="final-title">
+      <h2 id="final-title" data-reveal>Pin your circuits before the next upgrade.</h2>
+      <div class="cta" data-reveal>
+        <a class="button primary" href="/docs">Read the docs</a>
+        <a class="button ghost" href="https://github.com/hackcat29/PinCheck">View on GitHub</a>
       </div>
     </section>
   </main>
 
-  <footer class="site wrap">
-    <p>PinCheck {{VERSION}} · TapeOut <a href="https://github.com/TapeOutProtocol/TAPs/blob/main/TAPs/TAP-02.md">TAP-02</a> netlists on X Layer mainnet (chain 196) · Examples use the public <a href="https://github.com/0xdopewilly/fusebox#live-on-x-layer-mainnet-chain-196">OrderGuard</a> and <a href="https://github.com/tizerluo/neon-reliquary-xlayer/blob/main/docs/XLAYER-MAINNET.md">Neon Reliquary</a> deployments, which PinCheck does not own.</p>
+  <footer class="footer">
+    <div class="wrap footer-bar">
+      <span class="brand small"><span class="mark" aria-hidden="true"><i></i></span>PinCheck {{VERSION}}</span>
+      <nav aria-label="Footer">
+        <a href="/docs">Docs</a>
+        <a href="https://github.com/hackcat29/PinCheck">GitHub</a>
+        <a href="/llms.txt">llms.txt</a>
+        <a href="https://github.com/TapeOutProtocol/TAPs/blob/main/TAPs/TAP-02.md">TAP-02</a>
+      </nav>
+      <p>Examples use the public <a href="https://github.com/0xdopewilly/fusebox#live-on-x-layer-mainnet-chain-196">OrderGuard</a> and <a href="https://github.com/tizerluo/neon-reliquary-xlayer/blob/main/docs/XLAYER-MAINNET.md">Neon Reliquary</a> deployments.</p>
+    </div>
   </footer>
 </body>
 </html>

@@ -17,6 +17,8 @@ docker run --rm -p 8080:8080 -e X_LAYER_RPC="$X_LAYER_RPC" pincheck
 
 Put it behind your usual HTTPS proxy or platform load balancer. Run one instance per host; instances share nothing, so more instances only spread load.
 
+The site's JavaScript libraries and fonts (three.js, TypeGPU, Geist) are bundled into `web/vendor` and served from the same origin, so the strict Content Security Policy needs no third-party hosts. `npm run vendor` rebuilds them from pinned npm versions; the server gzips text assets on the fly.
+
 ## Environment
 
 | Variable | Default | Purpose |

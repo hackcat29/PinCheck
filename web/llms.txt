@@ -1,0 +1,26 @@
+# PinCheck
+
+> PinCheck catches breaking TapeOut circuit upgrades before they ship. It compares two TAP-02 circuits deployed on X Layer mainnet (chain 196) over every input at one pinned block hash, replays the first difference on the deployed processors, and returns one of four decisions: compatible, behavior-changed, interface-mismatch, inconclusive. A GitHub Action turns this into a required pull-request check.
+
+## Use it
+
+- HTTP: `GET /api/compare?baseline=<processor>:<id>&candidate=<processor>:<id>[&block=<hash|number|latest>]` returns a JSON report (schema 2). HTTP 400 for invalid input, 429 when busy (retry after the `Retry-After` seconds), 200 otherwise. A failed comparison is a 200 with `status: "inconclusive"` and a machine-readable `code`.
+- Health: `GET /api/health` (add `?deep=1` to check the RPC).
+- CLI: `node cli.mjs [--block HASH] <processor>:<id> <processor>:<id>` prints the same JSON. Exit 0 compatible, 1 behavior or interface changed, 2 inconclusive or invalid input.
+- Gate: `node cli.mjs gate --base A.json --head B.json --report out.json` compares a pull request's pincheck.json files.
+- GitHub Action: `uses: hackcat29/PinCheck@v0.2.0` with `manifest: pincheck.json`; required check name `Circuit compatibility`.
+
+## Read a report
+
+- `status`, `code`, `reason`: the decision; `code` explains an inconclusive result (for example `rpc-unavailable`, `no-circuit`, `unregistered-processor`, `stateful`, `too-wide`, `replay-disagrees`).
+- `comparison`: `method` (exhaustive, identical-netlist, sampled), `checked` of `space` inputs, `mismatches`, `firstMismatch` {packedInput, baselineOutput, candidateOutput, changedBits}. Vectors are hex, least significant bit first.
+- `replay.status`: confirmed, disagrees, unavailable, not-applicable, not-run. Local comparison and replay are independent.
+- `block`, `pinning`, `processors`, `factory`, `implementation`, `dependencies` (sha256 and keccak256 of each netlist): what was read.
+- A compatible result proves equal output bits for every input at that block under TAP-02. It does not prove correctness, business meaning, or behavior after a processor implementation change.
+
+## Docs
+
+- [Install and reference](/docs)
+- [Recorded examples](/examples/index.json): real reports with provenance; netlists in [/examples/netlists.json](/examples/netlists.json)
+- [Source and README](https://github.com/hackcat29/PinCheck)
+- [TAP-02 netlist format](https://github.com/TapeOutProtocol/TAPs/blob/main/TAPs/TAP-02.md)

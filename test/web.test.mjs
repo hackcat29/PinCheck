@@ -10,7 +10,9 @@ test('the hero evidence matches the recorded report it links to', async () => {
   const html = await read('web/index.html');
   const report = JSON.parse(await read('examples/orderguard-1-to-11.json'));
   const m = report.comparison.firstMismatch;
-  const row = html.slice(html.indexOf('<dl class="evidence-row">'), html.indexOf('</dl>'));
+  const start = html.indexOf('<dl class="evidence-row"');
+  const row = html.slice(start, html.indexOf('</dl>', start));
+  assert.ok(start > 0);
   for (const value of [m.packedInput, m.baselineOutput, m.candidateOutput]) assert.ok(row.includes('<dd') && row.includes(value), value);
   assert.ok(html.includes(Number(BigInt(report.block.number)).toLocaleString('en-US')));
   assert.ok(html.includes(coverage(report)));

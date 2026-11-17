@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
+import { gzipSync } from 'node:zlib';
 import { compareOnChain, reference, parseBlock, createRpc, defaultRpc, CheckError } from './src/xlayer.mjs';
 import { renderMarkdown } from './src/markdown.mjs';
 import { VERSION } from './src/report.mjs';
@@ -22,13 +23,41 @@ const STATIC = {
   '/docs.mjs': ['web/docs.mjs', 'text/javascript'],
   '/report.mjs': ['src/report.mjs', 'text/javascript'],
   '/favicon.svg': ['web/favicon.svg', 'image/svg+xml'],
+  '/llms.txt': ['web/llms.txt', 'text/plain'],
   '/examples/index.json': ['examples/index.json', 'application/json'],
+  '/examples/netlists.json': ['examples/netlists.json', 'application/json'],
   '/examples/orderguard-1-to-11.json': ['examples/orderguard-1-to-11.json', 'application/json'],
   '/examples/orderguard-1-to-2.json': ['examples/orderguard-1-to-2.json', 'application/json'],
   '/examples/neon-reliquary-5-vs-7.json': ['examples/neon-reliquary-5-vs-7.json', 'application/json'],
   '/demo/incompatible.json': ['demo/incompatible.json', 'application/json'],
   '/demo/compatible.json': ['demo/compatible.json', 'application/json'],
 };
+// Directories served by file name. Only plain names with an allowed extension resolve.
+const DIRS = {
+  '/vendor/': ['web/vendor/', { '.mjs': 'text/javascript', '.woff2': 'font/woff2', '.md': 'text/markdown', '.json': 'application/json' }],
+  '/landing/': ['web/landing/', { '.mjs': 'text/javascript' }],
+};
+function resolveStatic(pathname) {
+  if (Object.hasOwn(STATIC, pathname)) return STATIC[pathname];
+  for (const [prefix, [dir, types]] of Object.entries(DIRS)) {
+    if (!pathname.startsWith(prefix)) continue;
+    const name = pathname.slice(prefix.length);
+    const ext = name.slice(name.lastIndexOf('.'));
+    if (/^[a-z0-9][a-z0-9._-]*$/i.test(name) && !name.includes('..') && Object.hasOwn(types, ext)) return [dir + name, types[ext]];
+  }
+  return null;
+}
+const TEXT = /^(text\/|application\/json|image\/svg)/;
+const gzipped = new Map();  // path -> { mtime, body }
+async function compressed(file, data) {
+  const { mtimeMs } = await stat(new URL(file, root));
+  const hit = gzipped.get(file);
+  if (hit?.mtime === mtimeMs) return hit.body;
+  const body = gzipSync(data, { level: 9 });
+  gzipped.set(file, { mtime: mtimeMs, body });
+  return body;
+}
+
 const HEADERS = {
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
@@ -86,7 +115,7 @@ function clientOf(req) {
 export const server = createServer(async (req, res) => {
   const started = Date.now();
   const send = (status, body, type = 'application/json', extra = {}) => {
-    res.writeHead(status, { ...HEADERS, 'content-type': type + '; charset=utf-8', 'cache-control': 'no-store', ...extra });
+    res.writeHead(status, { ...HEADERS, 'content-type': TEXT.test(type) || type === 'text/javascript' ? type + '; charset=utf-8' : type, 'cache-control': 'no-store', ...extra });
     res.end(req.method === 'HEAD' ? undefined : typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
   };
   try {
@@ -134,11 +163,23 @@ export const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/docs' || pathname === '/docs/') return send(200, await docsPage(), 'text/html', { 'cache-control': 'no-cache' });
-    if (!Object.hasOwn(STATIC, pathname)) return send(404, { reason: 'Not found', code: 'not-found' });
-    const [file, type] = STATIC[pathname];
-    let data = await readFile(new URL(file, root));
-    if (pathname === '/') data = data.toString('utf8').replace(/\{\{VERSION\}\}/g, VERSION);
-    return send(200, data, type, { 'cache-control': pathname.startsWith('/examples/') || pathname.startsWith('/demo/') ? 'public, max-age=300' : 'no-cache' });
+    const found = resolveStatic(pathname);
+    if (!found) return send(404, { reason: 'Not found', code: 'not-found' });
+    const [file, type] = found;
+    let data;
+    try {
+      data = await readFile(new URL(file, root));
+    } catch (error) {
+      if (error.code === 'ENOENT') return send(404, { reason: 'Not found', code: 'not-found' });
+      throw error;
+    }
+    if (pathname === '/') data = Buffer.from(data.toString('utf8').replace(/\{\{VERSION\}\}/g, VERSION));
+    const cacheControl = pathname.startsWith('/vendor/') ? 'public, max-age=86400' : pathname.startsWith('/examples/') || pathname.startsWith('/demo/') ? 'public, max-age=300' : 'no-cache';
+    const extra = { 'cache-control': cacheControl, vary: 'accept-encoding' };
+    if (data.length > 1024 && (TEXT.test(type) || type === 'text/javascript') && /\bgzip\b/.test(req.headers['accept-encoding'] ?? '')) {
+      return send(200, pathname === '/' ? gzipSync(data) : await compressed(file, data), type, { ...extra, 'content-encoding': 'gzip' });
+    }
+    return send(200, data, type, extra);
   } catch (error) {
     console.error(JSON.stringify({ at: new Date().toISOString(), event: 'error', message: error.message }));
     if (!res.headersSent) send(500, { reason: 'Unexpected server error', code: 'server' });

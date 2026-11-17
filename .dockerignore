@@ -9,3 +9,4 @@ action.yml
 !docs/*.md
 report.json
 .env*
+!web/vendor/*.md
