@@ -42,3 +42,16 @@ test('the ruleset example requires the check name the workflow produces, from Gi
   assert.equal(check.integration_id, 15368);
   assert.equal(ruleset.rules.find(r => r.type === 'pull_request').parameters.require_code_owner_review, true);
 });
+
+test('README census figures match docs/census.json', async () => {
+  const readme = await read('README.md');
+  const census = JSON.parse(await read('docs/census.json'));
+  const { webExhaustive, ciExhaustive, wideStateless, stateful, tooLarge } = census.classes;
+  const provable = webExhaustive + ciExhaustive;
+  const fmt = n => n.toLocaleString('en-US');
+  for (const n of [census.circuits, webExhaustive, ciExhaustive, wideStateless, stateful, tooLarge, provable]) assert.ok(readme.includes(fmt(n)), fmt(n));
+  assert.ok(readme.includes((100 * provable / census.circuits).toFixed(1) + '%'));
+  assert.ok(readme.includes((100 * provable / (provable + wideStateless)).toFixed(1) + '%'));
+  assert.ok(readme.includes('block ' + fmt(census.block.number)));
+  assert.ok(readme.includes(census.processorsWithCircuits + ' of ' + census.processors + ' processors'));
+});
