@@ -1,49 +1,56 @@
 name: PinCheck
 on:
   push:
+    branches: [main]
   pull_request:
+  merge_group:
 permissions:
   contents: read
 jobs:
   unit:
     name: Evaluator tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
       - run: npm test
-  compatibility:
-    name: Circuit compatibility
-    if: github.event_name == 'pull_request'
+
+  smoke:
+    name: Mainnet smoke tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
-      - name: Read the proposed manifest
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/pincheck-pr"
-          test "$(git rev-parse refs/remotes/origin/pincheck-pr)" = "$HEAD_SHA"
-          git show "$HEAD_SHA:demo/circuit.json" > "$RUNNER_TEMP/candidate.json"
-      - name: Reject incompatible circuit changes
-        run: |
-          if cmp -s demo/circuit.json "$RUNNER_TEMP/candidate.json"; then
-            echo "Circuit manifest is unchanged"
-            exit 0
-          fi
-          node cli.mjs --manifest demo/circuit.json "$RUNNER_TEMP/candidate.json" > report.json
-      - uses: actions/upload-artifact@v4
-        if: always() && hashFiles('report.json') != ''
+      - run: npm run test:live
+
+  compatibility:
+    name: Circuit compatibility
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The action that judges a pull request comes from the base commit, so the pull request cannot change it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          name: pincheck-report
-          path: report.json
+          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          persist-credentials: false
+      - name: Gate pincheck.json
+        uses: ./
+        with:
+          manifest: pincheck.json
+      - name: Gate the original demo manifest
+        if: ${{ !cancelled() }}
+        uses: ./
+        with:
+          manifest: demo/circuit.json
+          artifact-name: pincheck-report-demo

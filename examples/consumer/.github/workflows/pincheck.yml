@@ -1,0 +1,16 @@
+name: PinCheck
+on:
+  pull_request:
+  merge_group:
+permissions:
+  contents: read
+jobs:
+  pincheck:
+    name: Circuit compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: hackcat29/PinCheck@v0.2.0
+        with:
+          manifest: pincheck.json
+          # rpc-url: ${{ secrets.X_LAYER_RPC }}

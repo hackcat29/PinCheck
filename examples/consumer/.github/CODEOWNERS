@@ -1,0 +1,4 @@
+# Changes to pinned circuits and to the check itself need a circuit owner's approval.
+/pincheck.json        @your-org/circuit-owners
+/.github/workflows/   @your-org/circuit-owners
+/.github/CODEOWNERS   @your-org/circuit-owners

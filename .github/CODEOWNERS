@@ -1,0 +1,6 @@
+# Pinned circuits and the release check itself.
+/pincheck.json        @hackcat29
+/demo/circuit.json    @hackcat29
+/action.yml           @hackcat29
+/action/              @hackcat29
+/.github/             @hackcat29
