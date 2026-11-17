@@ -41,7 +41,7 @@ jobs:
 
 Then add `.github/CODEOWNERS` for `pincheck.json` and `.github/workflows/`, and a branch ruleset that requires **Circuit compatibility** from GitHub Actions and code-owner review. [examples/consumer](examples/consumer) is the complete layout.
 
-> **Release status.** The action is verified on GitHub from branch `product/release-gate`, both installed by commit (`hackcat29/PinCheck@ab080a6…`) and from the base commit (pull requests [#3](https://github.com/hackcat29/PinCheck/pull/3), [#4](https://github.com/hackcat29/PinCheck/pull/4) and [#5](https://github.com/hackcat29/PinCheck/pull/5)). The `v0.2.0` tag that the snippet above uses is published when this branch is merged and tagged; until then `@v0.2.0` does not resolve.
+> **Release status.** v0.2.0 is the first release that includes the GitHub Action. Before release it was verified on GitHub both installed by commit and run from the base commit, in pull requests [#3](https://github.com/hackcat29/PinCheck/pull/3) (blocked), [#4](https://github.com/hackcat29/PinCheck/pull/4) (passed) and [#5](https://github.com/hackcat29/PinCheck/pull/5) (intended change accepted). For the strongest pin, replace `@v0.2.0` with the tag's full commit SHA.
 
 ## What a pass means
 
