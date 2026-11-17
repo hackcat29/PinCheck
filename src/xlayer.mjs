@@ -29,11 +29,16 @@ export async function compareOnChain(baseline, candidate, { url = defaultRpc, bl
     const signal = AbortSignal.any([budget, AbortSignal.timeout(15000)]);
     let body;
     if (process.env.PINCHECK_RPC_TRANSPORT === 'curl') {
-      const { stdout } = await promisify(execFile)('curl', [
-        '--disable', '--silent', '--show-error', '--fail', '--max-time', '14',
-        '--header', 'content-type: application/json', '--data-binary', payload, '--', url,
-      ], { signal, maxBuffer: 2_000_000 });
-      body = JSON.parse(stdout);
+      try {
+        const { stdout } = await promisify(execFile)('curl', [
+          '--disable', '--silent', '--show-error', '--fail', '--max-time', '14',
+          '--header', 'content-type: application/json', '--data-binary', payload, '--', url,
+        ], { signal, maxBuffer: 2_000_000 });
+        body = JSON.parse(stdout);
+      } catch (error) {
+        if (error.code === 'ENOENT') throw new Error('The curl RPC transport requires curl to be installed');
+        throw new Error('The curl RPC request failed or timed out');
+      }
     } else {
       const response = await fetch(url, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: payload, signal,

@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "evaluator": "pincheck/0.1.0 TAP-02 stateless",
+  "chainId": 196,
+  "baseline": {
+    "address": "0x57f319cf056f72f48cf1dbb670f2a3db007aa355",
+    "id": "1"
+  },
+  "candidate": {
+    "address": "0x57f319cf056f72f48cf1dbb670f2a3db007aa355",
+    "id": "11"
+  },
+  "block": {
+    "number": "0x48a1ee0",
+    "hash": "0x5069ea174c5373b88fd00a9172a0303b10364083dd85eadb131c32ee5aa06a99"
+  },
+  "status": "behavior-changed",
+  "nIn": 2,
+  "nOut": 1,
+  "checked": 4,
+  "mismatches": 3,
+  "firstMismatch": {
+    "input": 1,
+    "packedInput": "0x01",
+    "baselineOutput": "0x01",
+    "candidateOutput": "0x00",
+    "changedBits": [
+      0
+    ]
+  },
+  "dependencies": {
+    "0x57f319cf056f72f48cf1dbb670f2a3db007aa355:1": {
+      "nIn": 2,
+      "nOut": 1,
+      "nState": 0,
+      "sha256": "91c81eb018919169c97a8b7e10f4ab9bb2792960f53c0f4de3e3d2681939fd8e"
+    },
+    "0x57f319cf056f72f48cf1dbb670f2a3db007aa355:11": {
+      "nIn": 2,
+      "nOut": 1,
+      "nState": 0,
+      "sha256": "c4324090210ac67f13ecf1945e9c841e459e7c992f0cdf60de50cf7aa72e7a58"
+    }
+  },
+  "replay": {
+    "status": "confirmed",
+    "baselineOutput": "0x01",
+    "candidateOutput": "0x00"
+  }
+}

@@ -38,3 +38,10 @@ A compatible result applies to the recorded snapshot and the raw TAP-02 bit inte
 
 - [TapeOut TAP-02 netlist and processor interfaces](https://github.com/TapeOutProtocol/TAPs/blob/main/TAPs/TAP-02.md)
 - [OrderGuard public circuit deployment](https://github.com/0xdopewilly/fusebox#live-on-x-layer-mainnet-chain-196)
+
+## Reproduce the release demo
+
+Both examples use the public OrderGuard processor on X Layer. Start from circuit **#1** in the sample manifest. Compare it with **#11** to see the rejected change and with **#2** to see an accepted replacement. The first pair disagrees at input `0x01`. The second pair shares the same netlist. The separate **#5 → #9** workbench example checks 16 inputs and replays the mismatch at `0x05`.
+
+- [Incompatible live comparison report](demo/incompatible.json)
+- [Compatible live comparison report](demo/compatible.json)
