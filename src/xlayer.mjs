@@ -1,3 +1,5 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { compare } from './compare.mjs';
 
@@ -23,14 +25,22 @@ export async function compareOnChain(baseline, candidate, { url = defaultRpc, bl
   let id = 0;
   async function rpc(method, params) {
     const requestId = ++id;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: requestId, method, params }),
-      signal: AbortSignal.any([budget, AbortSignal.timeout(8000)]),
-    });
-    if (!response.ok) throw new Error('X Layer RPC returned HTTP ' + response.status);
-    const body = await response.json();
+    const payload = JSON.stringify({ jsonrpc: '2.0', id: requestId, method, params });
+    const signal = AbortSignal.any([budget, AbortSignal.timeout(8000)]);
+    let body;
+    if (process.env.PINCHECK_RPC_TRANSPORT === 'curl') {
+      const { stdout } = await promisify(execFile)('curl', [
+        '--disable', '--silent', '--show-error', '--fail', '--max-time', '8',
+        '--header', 'content-type: application/json', '--data-binary', payload, '--', url,
+      ], { signal, maxBuffer: 2_000_000 });
+      body = JSON.parse(stdout);
+    } else {
+      const response = await fetch(url, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: payload, signal,
+      });
+      if (!response.ok) throw new Error('X Layer RPC returned HTTP ' + response.status);
+      body = await response.json();
+    }
     if (body.id !== requestId || body.error || body.result == null) throw new Error(body.error?.message ?? 'Missing RPC result');
     return body.result;
   }

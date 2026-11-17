@@ -1,0 +1,49 @@
+name: PinCheck
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  unit:
+    name: Evaluator tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm test
+  compatibility:
+    name: Circuit compatibility
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Read the proposed manifest
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/pincheck-pr"
+          test "$(git rev-parse refs/remotes/origin/pincheck-pr)" = "$HEAD_SHA"
+          git show "$HEAD_SHA:demo/circuit.json" > "$RUNNER_TEMP/candidate.json"
+      - name: Reject incompatible circuit changes
+        run: |
+          if cmp -s demo/circuit.json "$RUNNER_TEMP/candidate.json"; then
+            echo "Circuit manifest is unchanged"
+            exit 0
+          fi
+          node cli.mjs --manifest demo/circuit.json "$RUNNER_TEMP/candidate.json" > report.json
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('report.json') != ''
+        with:
+          name: pincheck-report
+          path: report.json
