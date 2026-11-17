@@ -41,12 +41,12 @@ A TapeOut app calls a circuit by address and ID, for example `0x57F3…a355:1`. 
 
 ```mermaid
 flowchart LR
-  A["Pull request changes<br/>pincheck.json<br/>#1 → #11"] --> B["Read both netlists<br/>at one block hash<br/>(EIP-1898)"]
+  A["Pull request changes<br/>pincheck.json<br/>circuit 1 → 11"] --> B["Read both netlists<br/>at one block hash"]
   B --> C["Evaluate every input<br/>32 per machine word"]
-  C -->|an output differs| D["Replay that input with eval()<br/>on both deployed processors"]
+  C -->|an output differs| D["Replay that input<br/>on both deployed<br/>processors with eval"]
   C -->|all outputs equal| E["Spot-check on<br/>both processors"]
-  D --> F["✕ Circuit compatibility fails<br/>with the counterexample"]
-  E --> G["✓ Check passes,<br/>evidence recorded"]
+  D --> F["Circuit compatibility fails<br/>with the counterexample"]
+  E --> G["Check passes<br/>with evidence recorded"]
 ```
 
 1. **Pin.** `pincheck.json` lists the circuits your app calls. The baseline is read from the pull request's base commit, the candidate from its head, both as data; no pull-request code runs.
