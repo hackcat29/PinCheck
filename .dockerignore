@@ -1,0 +1,11 @@
+.git
+.github
+node_modules
+smoke
+test
+action
+action.yml
+*.md
+!docs/*.md
+report.json
+.env*
