@@ -3,7 +3,11 @@
   "description": "Circuits this repository's release check pins. The OrderGuard processor is a public demo deployment; PinCheck does not own it.",
   "dependencies": {
     "order-guard": {
-      "circuit": "0x57F319CF056F72F48cF1dbb670F2A3DB007Aa355:1"
+      "circuit": "0x57F319CF056F72F48cF1dbb670F2A3DB007Aa355:11",
+      "acceptChange": {
+        "from": "0x57F319CF056F72F48cF1dbb670F2A3DB007Aa355:1",
+        "reason": "Demonstration of an intended behavior change"
+      }
     }
   }
 }
