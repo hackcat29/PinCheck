@@ -11,7 +11,7 @@ npm test
 npm start
 ```
 
-Open http://localhost:4173. Enter each circuit as `processor-address:circuit-id`, or click **Try a live example**. The workbench shows coverage, a counterexample if one exists, and an X Layer replay result. Export JSON for automation or copy the replay link to rerun at the same block. A historical replay requires an RPC that retains state at that block.
+Open http://localhost:4173. Enter each circuit as `processor-address:circuit-id`, or click **Try a live mismatch** or **Try a compatible pair**. The workbench shows coverage, a counterexample if one exists, and an X Layer replay result. Export JSON for automation or copy the replay link to rerun at the same block. A historical replay requires an RPC that retains state at that block.
 
 ## CLI and CI
 

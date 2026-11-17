@@ -2,6 +2,7 @@ const form = document.querySelector('form');
 const byId = id => document.getElementById(id);
 const submit = form.querySelector('[type=submit]');
 const example = byId('example');
+const matchExample = byId('match-example');
 const processor = '0x57F319CF056F72F48cF1dbb670F2A3DB007Aa355';
 const titles = {
   compatible: 'Compatible',
@@ -23,7 +24,7 @@ function rows(id, entries) {
 }
 
 async function run(parameters) {
-  submit.disabled = example.disabled = true;
+  submit.disabled = example.disabled = matchExample.disabled = true;
   byId('results').hidden = false;
   byId('results').dataset.status = '';
   byId('status').textContent = 'Comparing circuits…';
@@ -60,18 +61,20 @@ async function run(parameters) {
     byId('status').textContent = 'Could not complete comparison';
     byId('detail').textContent = error.message;
   } finally {
-    submit.disabled = example.disabled = false;
+    submit.disabled = example.disabled = matchExample.disabled = false;
   }
 }
 form.addEventListener('submit', event => {
   event.preventDefault();
   run(new URLSearchParams(new FormData(form)));
 });
-example.addEventListener('click', () => {
-  form.elements.baseline.value = processor + ':1';
-  form.elements.candidate.value = processor + ':2';
+function showExample(baseline, candidate) {
+  form.elements.baseline.value = processor + ':' + baseline;
+  form.elements.candidate.value = processor + ':' + candidate;
   form.requestSubmit();
-});
+}
+example.addEventListener('click', () => showExample(5, 9));
+matchExample.addEventListener('click', () => showExample(1, 2));
 byId('download').addEventListener('click', () => {
   const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
   const link = document.createElement('a');

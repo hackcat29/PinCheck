@@ -21,16 +21,16 @@ function decodeBytes(value) {
 
 export async function compareOnChain(baseline, candidate, { url = defaultRpc, block = 'latest' } = {}) {
   const report = { schema: 1, evaluator: 'pincheck/0.1.0 TAP-02 stateless', chainId: 196, baseline, candidate };
-  const budget = AbortSignal.timeout(25000);
+  const budget = AbortSignal.timeout(60000);
   let id = 0;
   async function rpc(method, params) {
     const requestId = ++id;
     const payload = JSON.stringify({ jsonrpc: '2.0', id: requestId, method, params });
-    const signal = AbortSignal.any([budget, AbortSignal.timeout(8000)]);
+    const signal = AbortSignal.any([budget, AbortSignal.timeout(15000)]);
     let body;
     if (process.env.PINCHECK_RPC_TRANSPORT === 'curl') {
       const { stdout } = await promisify(execFile)('curl', [
-        '--disable', '--silent', '--show-error', '--fail', '--max-time', '8',
+        '--disable', '--silent', '--show-error', '--fail', '--max-time', '14',
         '--header', 'content-type: application/json', '--data-binary', payload, '--', url,
       ], { signal, maxBuffer: 2_000_000 });
       body = JSON.parse(stdout);
@@ -69,7 +69,7 @@ export async function compareOnChain(baseline, candidate, { url = defaultRpc, bl
     }
     if (result.firstMismatch) {
       const bytes = result.firstMismatch.packedInput.slice(2);
-      const args = word(32) + word(bytes.length / 2) + bytes.padEnd(Math.ceil(bytes.length / 64) * 64, '0');
+      const args = word(64) + word(bytes.length / 2) + bytes.padEnd(Math.ceil(bytes.length / 64) * 64, '0');
       const evaluate = async ({ address, id }) => decodeBytes(await call(address, '934d06ea' + word(id) + args));
       try {
         const [oldOutput, newOutput] = await Promise.all([evaluate(baseline), evaluate(candidate)]);
