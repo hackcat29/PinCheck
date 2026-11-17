@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PinCheck — TapeOut circuit compatibility</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.mjs"></script>
+</head>
+<body>
+  <header><a class="brand" href="/">Pin<span>Check</span></a><span class="network">X Layer mainnet</span></header>
+  <main>
+    <h1>Check a circuit<br>before you switch.</h1>
+    <p class="intro">Compare two deployed TapeOut circuits. See exactly which input changes the output before you upgrade your app.</p>
+    <form>
+      <h2>Compare circuits</h2>
+      <p class="hint">Enter each processor address followed by a colon and circuit ID.</p>
+      <div class="fields">
+        <label>Current circuit<input name="baseline" placeholder="0x…:1" autocomplete="off" spellcheck="false" required></label>
+        <label>Candidate circuit<input name="candidate" placeholder="0x…:2" autocomplete="off" spellcheck="false" required></label>
+      </div>
+      <div class="actions"><button type="submit">Run comparison</button><button class="secondary" type="button" id="example">Try a live example</button></div>
+    </form>
+    <section id="results" aria-live="polite" hidden>
+      <div class="result-head"><h2 id="status"></h2><button id="download" class="secondary" hidden>Download JSON</button></div>
+      <p id="detail"></p>
+      <dl id="metadata"></dl>
+      <div id="mismatch" hidden>
+        <h3>First different output</h3>
+        <dl id="outputs"></dl>
+        <p id="replay"></p>
+      </div>
+      <a id="permalink" hidden>Replay this comparison</a>
+    </section>
+    <footer>Exhaustive comparison for stateless circuits with up to eight input bits. <a href="https://github.com/TapeOutProtocol/TAPs/blob/main/TAPs/TAP-02.md">TapeOut specification</a></footer>
+  </main>
+</body>
+</html>
