@@ -1,0 +1,120 @@
+{
+  "schema": 2,
+  "tool": {
+    "name": "pincheck",
+    "version": "0.2.0"
+  },
+  "status": "behavior-changed",
+  "guarantee": "At least one input produces different outputs, so the candidate is not a drop-in replacement. The counterexample below is reproducible at X Layer block 76,163,385.",
+  "baseline": {
+    "address": "0x57e9e1111f42f448126a9f12b2b3f99a79dd1a44",
+    "id": "5"
+  },
+  "candidate": {
+    "address": "0x57e9e1111f42f448126a9f12b2b3f99a79dd1a44",
+    "id": "7"
+  },
+  "interface": {
+    "baseline": {
+      "nIn": 20,
+      "nOut": 22,
+      "nState": 0,
+      "gateCount": 50
+    },
+    "candidate": {
+      "nIn": 20,
+      "nOut": 22,
+      "nState": 0,
+      "gateCount": 50
+    }
+  },
+  "comparison": {
+    "status": "different",
+    "method": "exhaustive",
+    "exhaustive": true,
+    "checked": 1048576,
+    "space": "1048576",
+    "mismatches": 131072,
+    "firstMismatch": {
+      "input": 98320,
+      "packedInput": "0x108001",
+      "baselineOutput": "0x4f1201",
+      "candidateOutput": "0x4f1202",
+      "changedBits": [
+        16,
+        17
+      ]
+    },
+    "identicalNetlist": false
+  },
+  "replay": {
+    "status": "confirmed",
+    "kind": "counterexample",
+    "inputs": 1,
+    "baselineOutput": "0x4f1201",
+    "candidateOutput": "0x4f1202",
+    "checks": [
+      {
+        "packedInput": "0x108001",
+        "expected": [
+          "0x4f1201",
+          "0x4f1202"
+        ],
+        "actual": [
+          "0x4f1201",
+          "0x4f1202"
+        ]
+      }
+    ]
+  },
+  "chain": {
+    "id": 196,
+    "name": "X Layer mainnet"
+  },
+  "block": {
+    "number": "0x48a2939",
+    "hash": "0x4d61a2be73927f6f79f90187d26c1cd44b7d72eb3f11348154f53b94d0a54391",
+    "timestamp": "0x6afc7ec5"
+  },
+  "pinning": {
+    "method": "eip-1898-block-hash",
+    "requireCanonical": true
+  },
+  "processors": {
+    "0x57e9e1111f42f448126a9f12b2b3f99a79dd1a44": {
+      "registered": true
+    }
+  },
+  "factory": {
+    "address": "0x1f09daefa827f02cbb40967cc91b259763760761",
+    "sealed": false
+  },
+  "implementation": {
+    "beacon": "0xf70d1ed4f62cf3780157b0b421b7e2f45bd0991c",
+    "address": "0x977f217887e085d298cb3819cdad5a0ee35f29b2"
+  },
+  "dependencies": {
+    "0x57e9e1111f42f448126a9f12b2b3f99a79dd1a44:5": {
+      "nIn": 20,
+      "nOut": 22,
+      "nState": 0,
+      "gateCount": 50,
+      "bytes": 350,
+      "sha256": "03d52383dae0c8a396990b4ea5f03f919fd94d014b02985984cb78bf9931d0e1",
+      "keccak256": "0xe7817e016ecc710b8c7a2a68d10fdb24248eb2320155bb1d67d09e80a5200b02"
+    },
+    "0x57e9e1111f42f448126a9f12b2b3f99a79dd1a44:7": {
+      "nIn": 20,
+      "nOut": 22,
+      "nState": 0,
+      "gateCount": 50,
+      "bytes": 350,
+      "sha256": "56e15443dbe38408ec25fb98c253697b8f64573be31a48a88f3efb891ed99024",
+      "keccak256": "0x6d908bcafd0152fc0f1f40b16a2a556a8c5121f2db9996f8cbb81d08c68127f3"
+    }
+  },
+  "rpc": {
+    "endpoint": "https://rpc.xlayer.tech"
+  },
+  "generatedAt": "2026-11-17T16:20:28.101Z"
+}

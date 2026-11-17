@@ -1,0 +1,132 @@
+{
+  "schema": 2,
+  "tool": {
+    "name": "pincheck",
+    "version": "0.2.0"
+  },
+  "status": "compatible",
+  "guarantee": "Every one of the 4 possible inputs produces the same outputs from both circuits. It covers the raw TAP-02 output bits at X Layer block 76,160,736. It does not show that either circuit is correct, what the bits mean to your app, or how the circuits behave after the processor implementation changes.",
+  "baseline": {
+    "address": "0x57f319cf056f72f48cf1dbb670f2a3db007aa355",
+    "id": "1"
+  },
+  "candidate": {
+    "address": "0x57f319cf056f72f48cf1dbb670f2a3db007aa355",
+    "id": "2"
+  },
+  "interface": {
+    "baseline": {
+      "nIn": 2,
+      "nOut": 1,
+      "nState": 0,
+      "gateCount": 3
+    },
+    "candidate": {
+      "nIn": 2,
+      "nOut": 1,
+      "nState": 0,
+      "gateCount": 3
+    }
+  },
+  "comparison": {
+    "status": "equivalent",
+    "method": "exhaustive",
+    "exhaustive": true,
+    "checked": 4,
+    "space": "4",
+    "mismatches": 0,
+    "identicalNetlist": true
+  },
+  "replay": {
+    "status": "confirmed",
+    "kind": "spot-check",
+    "inputs": 3,
+    "baselineOutput": "0x01",
+    "candidateOutput": "0x01",
+    "checks": [
+      {
+        "packedInput": "0x00",
+        "expected": [
+          "0x01",
+          "0x01"
+        ],
+        "actual": [
+          "0x01",
+          "0x01"
+        ]
+      },
+      {
+        "packedInput": "0x03",
+        "expected": [
+          "0x00",
+          "0x00"
+        ],
+        "actual": [
+          "0x00",
+          "0x00"
+        ]
+      },
+      {
+        "packedInput": "0x02",
+        "expected": [
+          "0x01",
+          "0x01"
+        ],
+        "actual": [
+          "0x01",
+          "0x01"
+        ]
+      }
+    ]
+  },
+  "chain": {
+    "id": 196,
+    "name": "X Layer mainnet"
+  },
+  "block": {
+    "number": "0x48a1ee0",
+    "hash": "0x5069ea174c5373b88fd00a9172a0303b10364083dd85eadb131c32ee5aa06a99",
+    "timestamp": "0x6afc746c"
+  },
+  "pinning": {
+    "method": "eip-1898-block-hash",
+    "requireCanonical": true
+  },
+  "processors": {
+    "0x57f319cf056f72f48cf1dbb670f2a3db007aa355": {
+      "registered": true
+    }
+  },
+  "factory": {
+    "address": "0x1f09daefa827f02cbb40967cc91b259763760761",
+    "sealed": false
+  },
+  "implementation": {
+    "beacon": "0xf70d1ed4f62cf3780157b0b421b7e2f45bd0991c",
+    "address": "0x977f217887e085d298cb3819cdad5a0ee35f29b2"
+  },
+  "dependencies": {
+    "0x57f319cf056f72f48cf1dbb670f2a3db007aa355:1": {
+      "nIn": 2,
+      "nOut": 1,
+      "nState": 0,
+      "gateCount": 3,
+      "bytes": 21,
+      "sha256": "91c81eb018919169c97a8b7e10f4ab9bb2792960f53c0f4de3e3d2681939fd8e",
+      "keccak256": "0xc738359c3dde133a010e00bbc3dc1bd8685e3028a04e5df6e0f00cffa2ce2524"
+    },
+    "0x57f319cf056f72f48cf1dbb670f2a3db007aa355:2": {
+      "nIn": 2,
+      "nOut": 1,
+      "nState": 0,
+      "gateCount": 3,
+      "bytes": 21,
+      "sha256": "91c81eb018919169c97a8b7e10f4ab9bb2792960f53c0f4de3e3d2681939fd8e",
+      "keccak256": "0xc738359c3dde133a010e00bbc3dc1bd8685e3028a04e5df6e0f00cffa2ce2524"
+    }
+  },
+  "rpc": {
+    "endpoint": "https://rpc.xlayer.tech"
+  },
+  "generatedAt": "2026-11-17T16:20:05.072Z"
+}

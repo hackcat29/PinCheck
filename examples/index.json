@@ -1,0 +1,32 @@
+{
+  "examples": [
+    {
+      "id": "orderguard-1-to-11",
+      "title": "Rejected upgrade: OrderGuard #1 → #11",
+      "summary": "A pull request proposed replacing circuit #1 with #11. PinCheck found input 0x01 returns 0x01 from the current circuit and 0x00 from the candidate, both deployed processors confirmed it, and the required check failed.",
+      "report": "orderguard-1-to-11.json",
+      "original": "../demo/incompatible.json",
+      "pullRequest": "https://github.com/hackcat29/PinCheck/pull/1",
+      "run": "https://github.com/hackcat29/PinCheck/actions/runs/44116618733",
+      "recorded": "Captured by the GitHub check on 2026-11-17 and reproduced at the same block hash with PinCheck 0.2.0."
+    },
+    {
+      "id": "orderguard-1-to-2",
+      "title": "Accepted upgrade: OrderGuard #1 → #2",
+      "summary": "A pull request proposed replacing circuit #1 with #2. Both circuits share a netlist, all 4 inputs match, and the check passed.",
+      "report": "orderguard-1-to-2.json",
+      "original": "../demo/compatible.json",
+      "pullRequest": "https://github.com/hackcat29/PinCheck/pull/2",
+      "run": "https://github.com/hackcat29/PinCheck/actions/runs/44116681813",
+      "recorded": "Captured by the GitHub check on 2026-11-17 and reproduced at the same block hash with PinCheck 0.2.0."
+    },
+    {
+      "id": "neon-reliquary-5-vs-7",
+      "title": "Wide circuit: Neon Reliquary #5 vs #7 (20 inputs)",
+      "summary": "Two different published chips with the same 20-input, 22-output interface. Not a proposed upgrade: this shows that PinCheck checks all 1,048,576 inputs of a production-size circuit and replays the first difference on X Layer.",
+      "report": "neon-reliquary-5-vs-7.json",
+      "source": "https://github.com/tizerluo/neon-reliquary-xlayer/blob/main/docs/XLAYER-MAINNET.md",
+      "recorded": "Recorded with PinCheck 0.2.0 on 2026-11-17."
+    }
+  ]
+}
