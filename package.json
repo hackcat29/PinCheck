@@ -1,1 +1,1 @@
-{"name":"pincheck","version":"0.1.0","private":true,"type":"module","engines":{"node":">=22"},"scripts":{"test":"node --test","start":"node server.mjs","check":"node cli.mjs"}}
+{"name":"pincheck","version":"0.2.0","private":true,"type":"module","engines":{"node":">=22"},"scripts":{"test":"node --test","start":"node server.mjs","check":"node cli.mjs"}}
