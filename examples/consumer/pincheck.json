@@ -2,7 +2,7 @@
   "pincheck": 1,
   "dependencies": {
     "order-guard": {
-      "circuit": "0x57F319CF056F72F48cF1dbb670F2A3DB007Aa355:1"
+      "circuit": "0x57F319CF056F72F48cF1dbb670F2A3DB007Aa355:2"
     }
   }
 }
